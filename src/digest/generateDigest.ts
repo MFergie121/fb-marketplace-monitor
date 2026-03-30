@@ -42,12 +42,15 @@ export function generateDigest(input: {
           item.titleConfidence === 'low' ? 'weak-title' : null,
           item.reasons.some((reason) => reason.code === 'PLACEHOLDER_PRICE') ? 'placeholder-price' : null,
           item.reasons.some((reason) => reason.code === 'TITLE_LOOKS_LIKE_PRICE') ? 'title-from-price-risk' : null,
-          item.description ? 'detail-enriched' : null
+          item.description ? 'detail-enriched' : null,
+          item.valuation.classification.listingType === 'bundle_or_set' ? 'bundle' : null,
+          item.valuation.assessment === 'withheld' ? 'valuation-withheld' : null
         ].filter(Boolean).join(', ');
         const summaryBits = [
           item.location ?? 'Unknown location',
           item.condition ? `Condition: ${item.condition}` : null,
           `Title confidence: ${confidenceLabel}`,
+          `Type: ${item.valuation.classification.listingType} (${item.valuation.classification.confidence})`,
           `Valuation confidence: ${item.valuation.confidence}`
         ].filter(Boolean).join(' | ');
         const description = summarizeDescription(item.description);
@@ -57,6 +60,7 @@ export function generateDigest(input: {
 
         return `${index + 1}. [${item.profileId}] ${item.title} — ${formatPrice(item.price, item.currency, item.priceText)} — score ${item.score}${flags ? ` — flags: ${flags}` : ''}
    ${summaryBits}
+   Classification: ${item.valuation.classification.summary}
    Value: ${capitalize(item.valuation.assessment)} — ${item.valuation.summary}
 ${valuationSources ? `   Value sources: ${valuationSources}
 ` : ''}   Reasons: ${reasons || 'none'}

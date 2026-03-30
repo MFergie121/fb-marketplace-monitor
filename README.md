@@ -7,11 +7,14 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
 - Uses Playwright with a dedicated Chrome profile at:
   - `/Users/maxfergie/.openclaw/browser-profiles/fb-marketplace-monitor`
 - Reads config-driven Marketplace search profiles from JSON
+- Supports controlled per-profile search augmentation via named query expansions
 - Collects visible listing cards from Marketplace search pages
 - Shortlists a small configurable top-N per profile and opens detail pages to capture richer fields, especially description text
 - Stores runs, listings, observations, and digest previews in SQLite
 - Scores listings deterministically with explicit reason codes
+- Classifies listings as single-item, bundle/set, accessory/service/modification, or ambiguous
 - Adds valuation-aware scoring using manual references, category heuristics, and lightweight local DB baselines
+- Prevents single-item comps from being applied to bundles; fuzzy bundles get downgraded/withheld instead of fake precision
 - Penalises noisy patterns such as placeholder prices, `from $X`, `each`, quick-sale language, bulk/mixed bundles, and profile-configured unwanted variants
 - Boosts exact brands, configured model families, cleaner single-item listings, and relevant spec cues found in title or description
 - Generates Discord-friendly digest text with score explanations, valuation summaries (`attractive`, `fair`, `uncertain`, `overpriced`), and description snippets for enriched items
@@ -63,11 +66,17 @@ Search profiles live in `config/search-profiles.json`:
       "keywords": ["driver", "irons"],
       "unwantedKeywords": ["kids", "junior", "women's", "ladies"],
       "maxPrice": 1200,
-      "locationLabel": "Melbourne"
+      "locationLabel": "Melbourne",
+      "searchExpansions": [
+        { "label": "premium drivers", "query": "taylormade ping callaway driver" },
+        { "label": "iron sets", "query": "golf iron set" }
+      ]
     }
   ]
 }
 ```
+
+`searchExpansions` are optional extra Marketplace queries that roll back into the same profile. They are intentionally explicit and finite — no automatic synonym explosion.
 
 ### Valuation references
 
@@ -80,16 +89,25 @@ Each profile can optionally define `valuationReferences` to anchor known used-ma
   "priceLow": 450,
   "priceHigh": 650,
   "confidence": "high",
-  "notes": "Premium current-generation Ping driver range"
+  "notes": "Premium current-generation Ping driver range",
+  "listingTypeScope": "single_item"
 }
 ```
 
+Use `listingTypeScope` to keep references honest:
+
+- `single_item`: safe for individual items only
+- `bundle_or_set`: safe for recognisable bundles/sets only
+- `any`: rare escape hatch if a reference genuinely applies to both
+
 How valuation works:
 
-- `valuationReferences`: strongest signal when a known model/category match exists
+- listing classification runs first: `single_item`, `bundle_or_set`, `accessory_service_modification`, or `ambiguous`
+- `valuationReferences`: strongest signal when a known model/category match exists, filtered by `listingTypeScope`
 - category heuristics: fallback used-value bands for `golf`, `skis`, `ski-goggles`, and `ski-helmet`
-- local observed baseline: lightweight median-based band from similar historical observations already in SQLite
-- final digest output explains which sources were used and whether the price looks `attractive`, `fair`, `uncertain`, or `overpriced`
+- local observed baseline: lightweight median-based band from similar historical observations already in SQLite, but only from prior observations with the same listing type
+- bundle/set valuation only proceeds when the bundle is identifiable enough and a bundle-safe reference / heuristic / baseline exists
+- final digest output explains which sources were used and whether the price looks `attractive`, `fair`, `uncertain`, `overpriced`, or `withheld`
 
 Useful runtime knobs:
 
@@ -155,7 +173,8 @@ If a profile stalls, the monitor should fail that profile after `FBM_PROFILE_TIM
 Digest rows now include:
 
 - parsed title-confidence (`high`, `medium`, `low`)
-- risk flags for weak titles / placeholder pricing / detail enrichment
+- listing type + classification summary
+- risk flags for weak titles / placeholder pricing / detail enrichment / bundle valuation withholding
 - raw scoring reason codes with weights
 - valuation summary + supporting value sources/ranges
 - short description snippets when available

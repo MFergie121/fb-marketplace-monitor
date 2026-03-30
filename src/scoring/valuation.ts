@@ -1,32 +1,58 @@
 import type { AppDb } from '../db/database.js';
-import type { ListingObservation, SearchProfile, ValuationAssessment, ValuationContext, ValuationHeuristicRule, ValuationReference } from '../types.js';
+import { classifyListing } from './classifyListing.js';
+import type { ListingObservation, ListingTypeScope, SearchProfile, ValuationAssessment, ValuationContext, ValuationHeuristicRule, ValuationReference } from '../types.js';
 
 const CATEGORY_HEURISTICS: Record<string, ValuationHeuristicRule[]> = {
   golf: [
-    { key: 'golf-driver-premium', appliesWhen: ['driver'], referenceLow: 350, referenceHigh: 650, note: 'Premium used golf drivers often trade in the mid-hundreds locally' },
-    { key: 'golf-irons-set', appliesWhen: ['irons'], referenceLow: 300, referenceHigh: 900, note: 'Complete used iron sets usually sit above single-club pricing' },
-    { key: 'golf-putter', appliesWhen: ['putter'], referenceLow: 120, referenceHigh: 350, note: 'Recognisable used putters commonly hold value better than generic clubs' },
-    { key: 'golf-wedge', appliesWhen: ['wedge'], referenceLow: 70, referenceHigh: 180, note: 'Single wedges usually price lower than drivers or iron sets' },
-    { key: 'golf-club-generic', appliesWhen: ['golf', 'club'], referenceLow: 80, referenceHigh: 300, note: 'Fallback used golf-club range when model match is unclear' },
-    { key: 'golf-bag', appliesWhen: ['bag'], referenceLow: 40, referenceHigh: 180, note: 'Golf bags tend to be lower-value unless premium branded' }
+    { key: 'golf-driver-premium', appliesWhen: ['driver'], referenceLow: 350, referenceHigh: 650, note: 'Premium used golf drivers often trade in the mid-hundreds locally', listingTypeScope: 'single_item' },
+    { key: 'golf-irons-set', appliesWhen: ['irons', 'set'], referenceLow: 300, referenceHigh: 900, note: 'Complete used iron sets usually sit above single-club pricing', listingTypeScope: 'bundle_or_set' },
+    { key: 'golf-putter', appliesWhen: ['putter'], referenceLow: 120, referenceHigh: 350, note: 'Recognisable used putters commonly hold value better than generic clubs', listingTypeScope: 'single_item' },
+    { key: 'golf-wedge', appliesWhen: ['wedge'], referenceLow: 70, referenceHigh: 180, note: 'Single wedges usually price lower than drivers or iron sets', listingTypeScope: 'single_item' },
+    { key: 'golf-club-generic', appliesWhen: ['golf', 'club'], referenceLow: 80, referenceHigh: 300, note: 'Fallback used golf-club range when model match is unclear', listingTypeScope: 'single_item' },
+    { key: 'golf-bag', appliesWhen: ['bag'], referenceLow: 40, referenceHigh: 180, note: 'Golf bags tend to be lower-value unless premium branded', listingTypeScope: 'accessory_service_modification' }
   ],
   skis: [
-    { key: 'ski', appliesWhen: ['ski', 'skis'], referenceLow: 180, referenceHigh: 550, note: 'Used skis often depend heavily on age and bindings, so confidence stays modest' }
+    { key: 'ski-pair', appliesWhen: ['ski', 'skis'], referenceLow: 180, referenceHigh: 550, note: 'Used skis often depend heavily on age and bindings, so confidence stays modest', listingTypeScope: 'bundle_or_set' }
   ],
   'ski-goggles': [
-    { key: 'goggles', appliesWhen: ['goggles'], referenceLow: 40, referenceHigh: 120, note: 'Used goggles are usually accessory-priced unless premium lenses are specified' }
+    { key: 'goggles', appliesWhen: ['goggles'], referenceLow: 40, referenceHigh: 120, note: 'Used goggles are usually accessory-priced unless premium lenses are specified', listingTypeScope: 'single_item' }
   ],
   'ski-helmet': [
-    { key: 'helmet', appliesWhen: ['helmet'], referenceLow: 30, referenceHigh: 120, note: 'Used helmets carry more condition uncertainty so pricing confidence is conservative' }
+    { key: 'helmet', appliesWhen: ['helmet'], referenceLow: 30, referenceHigh: 120, note: 'Used helmets carry more condition uncertainty so pricing confidence is conservative', listingTypeScope: 'single_item' }
   ]
 };
 
 export function buildValuationContext(db: AppDb, observation: ListingObservation, profile: SearchProfile): ValuationContext {
   const haystack = normalize([observation.title, observation.description].filter(Boolean).join(' '));
-  const reference = pickManualReference(profile.valuationReferences ?? [], haystack);
-  const heuristic = pickHeuristic(profile, haystack);
-  const localBaseline = getLocalBaseline(db, profile, observation, reference, heuristic);
-  const riskyPricing = hasRiskyPricingContext(observation, haystack);
+  const classification = classifyListing(observation);
+
+  if (classification.listingType === 'accessory_service_modification') {
+    return {
+      assessment: 'withheld',
+      summary: `Valuation withheld: ${classification.summary}`,
+      price: observation.price ?? null,
+      sources: [],
+      confidence: 'low',
+      classification
+    };
+  }
+
+  if (classification.listingType === 'ambiguous') {
+    return {
+      assessment: 'uncertain',
+      summary: `Valuation downgraded: ${classification.summary}`,
+      price: observation.price ?? null,
+      sources: [],
+      confidence: 'low',
+      classification
+    };
+  }
+
+  const allowedScope: ListingTypeScope = classification.listingType === 'bundle_or_set' ? 'bundle_or_set' : 'single_item';
+  const reference = pickManualReference(profile.valuationReferences ?? [], haystack, allowedScope);
+  const heuristic = pickHeuristic(profile, haystack, allowedScope);
+  const localBaseline = getLocalBaseline(db, profile, observation, reference, heuristic, allowedScope);
+  const riskyPricing = hasRiskyPricingContext(observation, haystack, classification.listingType);
 
   const sources = [] as ValuationContext['sources'];
   if (reference) {
@@ -36,7 +62,8 @@ export function buildValuationContext(db: AppDb, observation: ListingObservation
       priceLow: reference.priceLow,
       priceHigh: reference.priceHigh,
       confidence: reference.confidence ?? 'high',
-      detail: reference.notes ?? `Manual reference matched terms: ${reference.matchTerms.join(', ')}`
+      detail: reference.notes ?? `Manual reference matched terms: ${reference.matchTerms.join(', ')}`,
+      listingTypeScope: reference.listingTypeScope ?? inferReferenceScope(reference)
     });
   }
 
@@ -47,7 +74,8 @@ export function buildValuationContext(db: AppDb, observation: ListingObservation
       priceLow: heuristic.referenceLow,
       priceHigh: heuristic.referenceHigh,
       confidence: 'medium',
-      detail: heuristic.note
+      detail: heuristic.note,
+      listingTypeScope: heuristic.listingTypeScope ?? 'any'
     });
   }
 
@@ -58,8 +86,32 @@ export function buildValuationContext(db: AppDb, observation: ListingObservation
       priceLow: localBaseline.priceLow,
       priceHigh: localBaseline.priceHigh,
       confidence: localBaseline.sampleSize >= 5 ? 'medium' : 'low',
-      detail: `Based on ${localBaseline.sampleSize} local observation${localBaseline.sampleSize === 1 ? '' : 's'}; median ${Math.round(localBaseline.medianPrice)}`
+      detail: `Based on ${localBaseline.sampleSize} local observation${localBaseline.sampleSize === 1 ? '' : 's'}; median ${Math.round(localBaseline.medianPrice)}`,
+      listingTypeScope: allowedScope
     });
+  }
+
+  if (classification.listingType === 'bundle_or_set' && !classification.canDecomposeBundle) {
+    return {
+      assessment: 'withheld',
+      summary: `Bundle valuation withheld: components are too fuzzy (${classification.summary})`,
+      price: observation.price ?? null,
+      matchedReferenceLabel: reference?.label,
+      sources,
+      confidence: 'low',
+      classification
+    };
+  }
+
+  if (classification.listingType === 'bundle_or_set' && sources.length === 0) {
+    return {
+      assessment: 'withheld',
+      summary: `Bundle valuation withheld: components were identified but no bundle-safe reference or baseline matched (${classification.summary})`,
+      price: observation.price ?? null,
+      sources,
+      confidence: 'low',
+      classification
+    };
   }
 
   if (riskyPricing) {
@@ -69,7 +121,8 @@ export function buildValuationContext(db: AppDb, observation: ListingObservation
       price: observation.price ?? null,
       matchedReferenceLabel: reference?.label,
       sources,
-      confidence: 'low'
+      confidence: 'low',
+      classification
     };
   }
 
@@ -80,24 +133,28 @@ export function buildValuationContext(db: AppDb, observation: ListingObservation
       price: observation.price ?? null,
       matchedReferenceLabel: reference?.label,
       sources,
-      confidence: 'low'
+      confidence: 'low',
+      classification
     };
   }
 
   const anchor = chooseAnchor(reference, heuristic, localBaseline);
   if (!anchor) {
     return {
-      assessment: 'uncertain',
-      summary: 'No manual reference, category heuristic, or local baseline matched this listing',
+      assessment: classification.listingType === 'bundle_or_set' ? 'withheld' : 'uncertain',
+      summary: classification.listingType === 'bundle_or_set'
+        ? 'Bundle valuation withheld because no bundle-safe manual reference, category heuristic, or local baseline matched this listing'
+        : 'No manual reference, category heuristic, or local baseline matched this listing',
       price: observation.price,
       matchedReferenceLabel: reference?.label,
       sources,
-      confidence: 'low'
+      confidence: 'low',
+      classification
     };
   }
 
   const assessment = assessPrice(observation.price, anchor.priceLow, anchor.priceHigh, sources.length, Boolean(reference));
-  const summary = summarizeAssessment(observation.price, anchor.priceLow, anchor.priceHigh, anchor.label, assessment, sources, localBaseline?.sampleSize);
+  const summary = summarizeAssessment(observation.price, anchor.priceLow, anchor.priceHigh, anchor.label, assessment, sources, localBaseline?.sampleSize, classification.summary);
 
   return {
     assessment,
@@ -105,15 +162,18 @@ export function buildValuationContext(db: AppDb, observation: ListingObservation
     price: observation.price,
     matchedReferenceLabel: reference?.label,
     sources,
-    confidence: anchor.confidence
+    confidence: anchor.confidence,
+    classification
   };
 }
 
-function pickManualReference(references: ValuationReference[], haystack: string): ValuationReference | null {
+function pickManualReference(references: ValuationReference[], haystack: string, allowedScope: ListingTypeScope): ValuationReference | null {
   let best: ValuationReference | null = null;
   let bestScore = -1;
 
   for (const reference of references) {
+    const scope = reference.listingTypeScope ?? inferReferenceScope(reference);
+    if (!scopeMatches(scope, allowedScope)) continue;
     const terms = reference.matchTerms.map(normalize).filter(Boolean);
     const matches = terms.filter((term) => haystack.includes(term)).length;
     if (matches === 0) continue;
@@ -127,13 +187,15 @@ function pickManualReference(references: ValuationReference[], haystack: string)
   return best;
 }
 
-function pickHeuristic(profile: SearchProfile, haystack: string): ValuationHeuristicRule | null {
+function pickHeuristic(profile: SearchProfile, haystack: string, allowedScope: ListingTypeScope): ValuationHeuristicRule | null {
   const category = profile.category ?? 'generic';
   const rules = CATEGORY_HEURISTICS[category] ?? [];
   let best: ValuationHeuristicRule | null = null;
   let bestScore = -1;
 
   for (const rule of rules) {
+    const scope = rule.listingTypeScope ?? 'any';
+    if (!scopeMatches(scope, allowedScope)) continue;
     const matches = rule.appliesWhen.map(normalize).filter((term) => haystack.includes(term)).length;
     if (matches === 0) continue;
     const score = matches * 100 + rule.appliesWhen.length;
@@ -151,7 +213,8 @@ function getLocalBaseline(
   profile: SearchProfile,
   observation: ListingObservation,
   reference: ValuationReference | null,
-  heuristic: ValuationHeuristicRule | null
+  heuristic: ValuationHeuristicRule | null,
+  allowedScope: ListingTypeScope
 ): { label: string; priceLow: number; priceHigh: number; medianPrice: number; sampleSize: number } | null {
   const terms = new Set<string>();
 
@@ -180,7 +243,7 @@ function getLocalBaseline(
   if (candidateTerms.length === 0) return null;
 
   const whereTerms = candidateTerms.map(() => "(LOWER(o.title) LIKE ? OR LOWER(COALESCE(o.description, '')) LIKE ?)").join(' OR ');
-  const params: Array<string | number> = [profile.id, observation.externalId];
+  const params: Array<string | number> = [profile.id, observation.externalId, `%\"listingType\":\"${allowedScope}%`];
   for (const term of candidateTerms) {
     const like = `%${term}%`;
     params.push(like, like);
@@ -194,6 +257,7 @@ function getLocalBaseline(
       AND o.price IS NOT NULL
       AND o.price > 20
       AND l.external_id != ?
+      AND LOWER(o.raw_json) LIKE ?
       AND (${whereTerms})
     ORDER BY o.observed_at DESC
     LIMIT 25
@@ -263,15 +327,16 @@ function summarizeAssessment(
   label: string,
   assessment: ValuationAssessment,
   sources: ValuationContext['sources'],
-  sampleSize?: number
+  sampleSize: number | undefined,
+  classificationSummary: string
 ): string {
   const base = `${assessment} vs ${label}: price ${price} against estimated range ${low}-${high}`;
   const sourceNames = sources.map((source) => source.source.replace('_', ' ')).join(', ');
   const localNote = sampleSize ? `; local sample n=${sampleSize}` : '';
-  return `${base} (${sourceNames || 'no supporting sources'}${localNote})`;
+  return `${base} (${sourceNames || 'no supporting sources'}${localNote}); ${classificationSummary}`;
 }
 
-function hasRiskyPricingContext(observation: ListingObservation, haystack: string): string | null {
+function hasRiskyPricingContext(observation: ListingObservation, haystack: string, listingType: 'single_item' | 'bundle_or_set'): string | null {
   if (observation.price != null && observation.price <= 1) {
     return 'Price looks like a placeholder/bait amount, so valuation is uncertain';
   }
@@ -279,12 +344,24 @@ function hasRiskyPricingContext(observation: ListingObservation, haystack: strin
     return 'Title parse confidence is low, so valuation is uncertain';
   }
   if (/\bfrom\s+(?:au\$|\$)?\s*\d|\beach\b|\bper\s+(?:item|piece|pc)\b/i.test(haystack)) {
-    return 'Per-item or from-price wording makes true listing value uncertain';
+    return listingType === 'bundle_or_set'
+      ? 'Bundle uses per-item or from-price wording, so total value is uncertain'
+      : 'Per-item or from-price wording makes true listing value uncertain';
   }
-  if (/\bbulk\b|\bbundle\b|\bmixed\b|\bassorted\b|\bjob\s+lot\b/i.test(haystack)) {
-    return 'Bundle/mixed-item wording makes single-item valuation uncertain';
+  if (listingType === 'bundle_or_set' && /\bbulk\b|\bmixed\b|\bassorted\b|\bjob\s+lot\b/i.test(haystack)) {
+    return 'Bundle contains mixed-item wording, so valuation confidence is downgraded';
   }
   return null;
+}
+
+function inferReferenceScope(reference: ValuationReference): ListingTypeScope {
+  const label = normalize(`${reference.label} ${reference.matchTerms.join(' ')}`);
+  if (/\b(set|bundle|lot|pair|skis|irons)\b/.test(label)) return 'bundle_or_set';
+  return 'single_item';
+}
+
+function scopeMatches(scope: ListingTypeScope, allowedScope: ListingTypeScope): boolean {
+  return scope === 'any' || scope === allowedScope;
 }
 
 function normalize(value?: string | null): string {

@@ -8,10 +8,14 @@
       "category": "golf",
       "brandPreferences": ["TaylorMade", "Titleist", "Ping", "Callaway"],
       "modelFamilies": ["Stealth", "Paradym", "G430"],
-      "keywords": ["driver", "irons", "set"],
+      "keywords": ["driver", "irons"],
       "unwantedKeywords": ["kids", "junior", "women's", "ladies"],
       "maxPrice": 1200,
       "locationLabel": "Melbourne",
+      "searchExpansions": [
+        { "label": "premium drivers", "query": "taylormade ping callaway driver" },
+        { "label": "iron sets", "query": "golf iron set" }
+      ],
       "valuationReferences": [
         {
           "label": "TaylorMade Stealth driver",
@@ -19,7 +23,8 @@
           "priceLow": 320,
           "priceHigh": 480,
           "confidence": "high",
-          "notes": "Solid used-market band for Stealth drivers in decent condition"
+          "notes": "Solid used-market band for Stealth drivers in decent condition",
+          "listingTypeScope": "single_item"
         },
         {
           "label": "Ping G430 driver",
@@ -27,7 +32,17 @@
           "priceLow": 450,
           "priceHigh": 650,
           "confidence": "high",
-          "notes": "Premium current-generation Ping driver range"
+          "notes": "Premium current-generation Ping driver range",
+          "listingTypeScope": "single_item"
+        },
+        {
+          "label": "Players distance iron set",
+          "matchTerms": ["p790", "t200", "iron set"],
+          "priceLow": 700,
+          "priceHigh": 1300,
+          "confidence": "medium",
+          "notes": "Bundle-safe reference for recognisable iron sets",
+          "listingTypeScope": "bundle_or_set"
         }
       ]
     },
@@ -42,7 +57,11 @@
       "keywords": ["automatic", "diver", "vintage"],
       "unwantedKeywords": ["women's", "ladies", "kids"],
       "maxPrice": 600,
-      "locationLabel": "Melbourne"
+      "locationLabel": "Melbourne",
+      "searchExpansions": [
+        { "label": "automatic", "query": "automatic diver watch" },
+        { "label": "seiko", "query": "seiko 5 watch" }
+      ]
     }
   ]
 }

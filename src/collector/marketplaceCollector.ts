@@ -1,7 +1,7 @@
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import type { Logger } from '../logging.js';
 import { scoreListing } from '../scoring/scoreListings.js';
-import type { RawListing, SearchProfile, TitleConfidence } from '../types.js';
+import type { RawListing, SearchExpansion, SearchProfile, TitleConfidence } from '../types.js';
 
 export type CollectorOptions = {
   profileDir: string;
@@ -68,21 +68,57 @@ export async function collectMarketplaceListings(profiles: SearchProfile[], opti
 }
 
 async function collectProfile(context: BrowserContext, profile: SearchProfile, options: CollectorOptions): Promise<RawListing[]> {
+  const variants = buildSearchVariants(profile);
+  const items: RawListing[] = [];
+
+  for (const variant of variants) {
+    options.logger.debug(`Profile ${profile.id}: variant ${variant.label} -> ${variant.url}`);
+    const variantItems = await collectProfileVariant(context, profile, variant, options);
+    for (const item of variantItems) {
+      if (!items.some((existing) => existing.externalId === item.externalId)) {
+        items.push(item);
+      }
+      if (items.length >= options.maxListingsPerProfile) {
+        return items.slice(0, options.maxListingsPerProfile);
+      }
+    }
+  }
+
+  return items;
+}
+
+function buildSearchVariants(profile: SearchProfile): Array<{ label: string; url: string }> {
+  const variants: Array<{ label: string; url: string }> = [{ label: 'primary', url: profile.url }];
+  for (const expansion of profile.searchExpansions ?? []) {
+    variants.push({ label: expansion.label, url: applySearchExpansion(profile.url, expansion) });
+  }
+  return variants;
+}
+
+function applySearchExpansion(baseUrl: string, expansion: SearchExpansion): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set('query', expansion.query);
+  return url.toString();
+}
+
+async function collectProfileVariant(
+  context: BrowserContext,
+  profile: SearchProfile,
+  variant: { label: string; url: string },
+  options: CollectorOptions
+): Promise<RawListing[]> {
   const page = await context.newPage();
   page.setDefaultNavigationTimeout(options.navTimeoutMs);
   page.setDefaultTimeout(options.navTimeoutMs);
 
   try {
-    options.logger.debug(`Profile ${profile.id}: navigating to ${profile.url}`);
-    await page.goto(profile.url, { waitUntil: 'domcontentloaded' });
-    options.logger.debug(`Profile ${profile.id}: page loaded, waiting for Marketplace cards`);
+    await page.goto(variant.url, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(5000);
-    await autoScroll(page, options.logger, profile.id);
+    await autoScroll(page, options.logger, `${profile.id}:${variant.label}`);
 
     const cards = page.locator('a[href*="/marketplace/item/"]');
     const rawCount = await cards.count();
     const count = Math.min(rawCount, options.maxListingsPerProfile);
-    options.logger.debug(`Profile ${profile.id}: found ${rawCount} candidate card(s), reading ${count}`);
     const items: RawListing[] = [];
 
     for (let i = 0; i < count; i += 1) {
@@ -126,7 +162,7 @@ async function collectProfile(context: BrowserContext, profile: SearchProfile, o
     }
 
     if (options.debug) {
-      options.logger.debug(`Profile ${profile.id}: collected ${items.length} unique card(s)`);
+      options.logger.debug(`Profile ${profile.id}: variant ${variant.label} collected ${items.length} unique card(s)`);
     }
 
     return items;
@@ -275,7 +311,15 @@ function shortlistForEnrichment(profile: SearchProfile, items: RawListing[], top
           summary: 'Pre-enrichment shortlist uses non-valuation scoring only',
           price: item.price ?? null,
           confidence: 'low',
-          sources: []
+          sources: [],
+          classification: {
+            listingType: 'ambiguous',
+            confidence: 'low',
+            summary: 'Pre-enrichment shortlist has not classified the listing yet',
+            matchedSignals: [],
+            identifiedComponents: [],
+            canDecomposeBundle: false
+          }
         }
       ).score
     }))

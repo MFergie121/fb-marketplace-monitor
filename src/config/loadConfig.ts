@@ -3,13 +3,21 @@ import path from 'node:path';
 import { z } from 'zod';
 import type { AppConfig } from '../types.js';
 
+const listingTypeScopeSchema = z.enum(['single_item', 'bundle_or_set', 'accessory_service_modification', 'any']);
+
+const searchExpansionSchema = z.object({
+  label: z.string().min(1),
+  query: z.string().min(1)
+});
+
 const valuationReferenceSchema = z.object({
   label: z.string().min(1),
   matchTerms: z.array(z.string().min(1)).min(1),
   priceLow: z.number().positive(),
   priceHigh: z.number().positive(),
   confidence: z.enum(['high', 'medium', 'low']).optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  listingTypeScope: listingTypeScopeSchema.optional()
 }).refine((value) => value.priceHigh >= value.priceLow, {
   message: 'priceHigh must be >= priceLow'
 });
@@ -27,6 +35,7 @@ const profileSchema = z.object({
   maxPrice: z.number().optional(),
   minPrice: z.number().optional(),
   locationLabel: z.string().optional(),
+  searchExpansions: z.array(searchExpansionSchema).optional(),
   valuationReferences: z.array(valuationReferenceSchema).optional()
 });
 

@@ -113,6 +113,8 @@ export function scoreListing(
     reasons.push({ code: 'VAGUE_LISTING', weight: -12, detail: specificity.vagueListing });
   }
 
+  reasons.push(...classificationReasons(valuation));
+
   for (const cue of detectSpecCues(haystack)) {
     reasons.push(cue);
   }
@@ -130,6 +132,21 @@ export function scoreListing(
   };
 }
 
+function classificationReasons(valuation: ValuationContext): ScoreReason[] {
+  const summary = valuation.classification.summary;
+  switch (valuation.classification.listingType) {
+    case 'single_item':
+      return [{ code: 'LISTING_TYPE_SINGLE_ITEM', weight: 10, detail: summary }];
+    case 'bundle_or_set':
+      return [{ code: 'LISTING_TYPE_BUNDLE', weight: valuation.classification.canDecomposeBundle ? -8 : -18, detail: summary }];
+    case 'accessory_service_modification':
+      return [{ code: 'LISTING_TYPE_ACCESSORY_SERVICE', weight: -20, detail: summary }];
+    case 'ambiguous':
+    default:
+      return [{ code: 'LISTING_TYPE_AMBIGUOUS', weight: -12, detail: summary }];
+  }
+}
+
 function valuationReasons(valuation: ValuationContext): ScoreReason[] {
   switch (valuation.assessment) {
     case 'attractive':
@@ -138,6 +155,8 @@ function valuationReasons(valuation: ValuationContext): ScoreReason[] {
       return [{ code: 'VALUATION_FAIR', weight: 8, detail: valuation.summary }];
     case 'overpriced':
       return [{ code: 'VALUATION_OVERPRICED', weight: -22, detail: valuation.summary }];
+    case 'withheld':
+      return [{ code: 'VALUATION_WITHHELD', weight: -10, detail: valuation.summary }];
     case 'uncertain':
     default:
       return [{ code: 'VALUATION_UNCERTAIN', weight: -4, detail: valuation.summary }];

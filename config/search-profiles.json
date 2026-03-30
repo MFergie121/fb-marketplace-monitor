@@ -11,6 +11,10 @@
       "maxPrice": 2000,
       "keywords": ["golf", "clubs", "driver", "irons", "set", "putter", "wedge"],
       "locationLabel": "Melbourne",
+      "searchExpansions": [
+        { "label": "premium drivers", "query": "taylormade ping callaway driver" },
+        { "label": "iron sets", "query": "golf iron set" }
+      ],
       "valuationReferences": [
         {
           "label": "TaylorMade Stealth driver",
@@ -18,7 +22,8 @@
           "priceLow": 320,
           "priceHigh": 480,
           "confidence": "high",
-          "notes": "Used Stealth drivers in solid condition typically land in this band"
+          "notes": "Used Stealth drivers in solid condition typically land in this band",
+          "listingTypeScope": "single_item"
         },
         {
           "label": "Ping G430 driver",
@@ -26,7 +31,8 @@
           "priceLow": 450,
           "priceHigh": 650,
           "confidence": "high",
-          "notes": "Current-generation Ping drivers usually hold value strongly"
+          "notes": "Current-generation Ping drivers usually hold value strongly",
+          "listingTypeScope": "single_item"
         },
         {
           "label": "Callaway Paradym driver",
@@ -34,7 +40,8 @@
           "priceLow": 420,
           "priceHigh": 620,
           "confidence": "high",
-          "notes": "Paradym drivers generally sit near premium used-driver pricing"
+          "notes": "Paradym drivers generally sit near premium used-driver pricing",
+          "listingTypeScope": "single_item"
         },
         {
           "label": "Players distance iron set",
@@ -42,7 +49,8 @@
           "priceLow": 700,
           "priceHigh": 1300,
           "confidence": "medium",
-          "notes": "Stronger iron-set reference for popular players-distance models"
+          "notes": "Stronger iron-set reference for popular players-distance models",
+          "listingTypeScope": "bundle_or_set"
         }
       ]
     },

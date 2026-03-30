@@ -1,4 +1,13 @@
-export type ValuationAssessment = 'attractive' | 'fair' | 'uncertain' | 'overpriced';
+export type ValuationAssessment = 'attractive' | 'fair' | 'uncertain' | 'overpriced' | 'withheld';
+
+export type ListingType = 'single_item' | 'bundle_or_set' | 'accessory_service_modification' | 'ambiguous';
+export type ListingTypeConfidence = 'high' | 'medium' | 'low';
+export type ListingTypeScope = 'single_item' | 'bundle_or_set' | 'accessory_service_modification' | 'any';
+
+export type SearchExpansion = {
+  label: string;
+  query: string;
+};
 
 export type ValuationReference = {
   label: string;
@@ -7,6 +16,7 @@ export type ValuationReference = {
   priceHigh: number;
   confidence?: 'high' | 'medium' | 'low';
   notes?: string;
+  listingTypeScope?: ListingTypeScope;
 };
 
 export type ValuationHeuristicRule = {
@@ -15,6 +25,7 @@ export type ValuationHeuristicRule = {
   referenceLow: number;
   referenceHigh: number;
   note: string;
+  listingTypeScope?: ListingTypeScope;
 };
 
 export type ValuationSource = {
@@ -24,6 +35,16 @@ export type ValuationSource = {
   priceHigh: number;
   confidence: 'high' | 'medium' | 'low';
   detail: string;
+  listingTypeScope?: ListingTypeScope;
+};
+
+export type ListingClassification = {
+  listingType: ListingType;
+  confidence: ListingTypeConfidence;
+  summary: string;
+  matchedSignals: string[];
+  identifiedComponents: string[];
+  canDecomposeBundle: boolean;
 };
 
 export type ValuationContext = {
@@ -33,6 +54,7 @@ export type ValuationContext = {
   matchedReferenceLabel?: string;
   confidence: 'high' | 'medium' | 'low';
   sources: ValuationSource[];
+  classification: ListingClassification;
 };
 
 export type SearchProfile = {
@@ -48,6 +70,7 @@ export type SearchProfile = {
   maxPrice?: number;
   minPrice?: number;
   locationLabel?: string;
+  searchExpansions?: SearchExpansion[];
   valuationReferences?: ValuationReference[];
 };
 
@@ -102,10 +125,15 @@ export type ScoreReasonCode =
   | 'SPECIFIC_LISTING'
   | 'SINGLE_ITEM_SIGNAL'
   | 'VAGUE_LISTING'
+  | 'LISTING_TYPE_SINGLE_ITEM'
+  | 'LISTING_TYPE_BUNDLE'
+  | 'LISTING_TYPE_ACCESSORY_SERVICE'
+  | 'LISTING_TYPE_AMBIGUOUS'
   | 'VALUATION_ATTRACTIVE'
   | 'VALUATION_FAIR'
   | 'VALUATION_UNCERTAIN'
-  | 'VALUATION_OVERPRICED';
+  | 'VALUATION_OVERPRICED'
+  | 'VALUATION_WITHHELD';
 
 export type ScoreReason = {
   code: ScoreReasonCode;
