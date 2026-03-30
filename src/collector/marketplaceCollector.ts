@@ -1,28 +1,49 @@
 import { chromium, type BrowserContext } from 'playwright';
+import type { Logger } from '../logging.js';
 import type { RawListing, SearchProfile, TitleConfidence } from '../types.js';
 
 export type CollectorOptions = {
   profileDir: string;
   headless: boolean;
   navTimeoutMs: number;
+  profileTimeoutMs: number;
   maxListingsPerProfile: number;
   debug: boolean;
+  logger: Logger;
 };
 
-export async function collectMarketplaceListings(profiles: SearchProfile[], options: CollectorOptions): Promise<Record<string, RawListing[]>> {
+export async function collectMarketplaceListings(profiles: SearchProfile[], options: CollectorOptions): Promise<{ itemsByProfile: Record<string, RawListing[]>; failures: Record<string, string>; }> {
+  options.logger.info(`Browser launch starting (profile=${options.profileDir}, headless=${options.headless})`);
   const context = await chromium.launchPersistentContext(options.profileDir, {
     channel: 'chrome',
     headless: options.headless,
     viewport: { width: 1440, height: 1400 }
   });
+  options.logger.info('Browser launched');
 
   try {
-    const results: Record<string, RawListing[]> = {};
+    const itemsByProfile: Record<string, RawListing[]> = {};
+    const failures: Record<string, string> = {};
     for (const profile of profiles.filter((item) => item.enabled)) {
-      results[profile.id] = await collectProfile(context, profile, options);
+      options.logger.info(`Profile ${profile.id} starting`);
+      try {
+        const items = await withTimeout(
+          collectProfile(context, profile, options),
+          options.profileTimeoutMs,
+          `Profile ${profile.id} timed out after ${options.profileTimeoutMs}ms`
+        );
+        itemsByProfile[profile.id] = items;
+        options.logger.info(`Profile ${profile.id} completed with ${items.length} item(s)`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failures[profile.id] = message;
+        itemsByProfile[profile.id] = [];
+        options.logger.warn(`Profile ${profile.id} failed: ${message}`);
+      }
     }
-    return results;
+    return { itemsByProfile, failures };
   } finally {
+    options.logger.info('Closing browser context');
     await context.close();
   }
 }
@@ -32,58 +53,65 @@ async function collectProfile(context: BrowserContext, profile: SearchProfile, o
   page.setDefaultNavigationTimeout(options.navTimeoutMs);
   page.setDefaultTimeout(options.navTimeoutMs);
 
-  await page.goto(profile.url, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(5000);
-  await autoScroll(page);
+  try {
+    options.logger.debug(`Profile ${profile.id}: navigating to ${profile.url}`);
+    await page.goto(profile.url, { waitUntil: 'domcontentloaded' });
+    options.logger.debug(`Profile ${profile.id}: page loaded, waiting for Marketplace cards`);
+    await page.waitForTimeout(5000);
+    await autoScroll(page, options.logger, profile.id);
 
-  const cards = page.locator('a[href*="/marketplace/item/"]');
-  const count = Math.min(await cards.count(), options.maxListingsPerProfile);
-  const items: RawListing[] = [];
+    const cards = page.locator('a[href*="/marketplace/item/"]');
+    const rawCount = await cards.count();
+    const count = Math.min(rawCount, options.maxListingsPerProfile);
+    options.logger.debug(`Profile ${profile.id}: found ${rawCount} candidate card(s), reading ${count}`);
+    const items: RawListing[] = [];
 
-  for (let i = 0; i < count; i += 1) {
-    const card = cards.nth(i);
-    const raw = await card.evaluate((node) => {
-      const el = node as HTMLAnchorElement;
-      const text = (el.innerText || '').split('\n').map((part) => part.trim()).filter(Boolean);
-      const href = el.href;
-      const externalIdMatch = href.match(/\/item\/(\d+)/);
-      const image = el.querySelector('img');
-      return {
-        externalId: externalIdMatch?.[1] ?? href,
-        text,
-        href,
-        imageUrl: image?.getAttribute('src') ?? null
+    for (let i = 0; i < count; i += 1) {
+      const card = cards.nth(i);
+      const raw = await card.evaluate((node) => {
+        const el = node as HTMLAnchorElement;
+        const text = (el.innerText || '').split('\n').map((part) => part.trim()).filter(Boolean);
+        const href = el.href;
+        const externalIdMatch = href.match(/\/item\/(\d+)/);
+        const image = el.querySelector('img');
+        return {
+          externalId: externalIdMatch?.[1] ?? href,
+          text,
+          href,
+          imageUrl: image?.getAttribute('src') ?? null
+        };
+      });
+
+      const parsed = parseMarketplaceCard(raw.text);
+      const listing: RawListing = {
+        externalId: raw.externalId,
+        title: parsed.title,
+        url: raw.href,
+        price: parsed.price,
+        priceText: parsed.priceText,
+        currency: parsed.currency,
+        location: parsed.location,
+        imageUrl: raw.imageUrl,
+        sellerName: null,
+        description: null,
+        postedText: raw.text.join(' | '),
+        titleConfidence: parsed.titleConfidence,
+        parserNotes: parsed.parserNotes
       };
-    });
 
-    const parsed = parseMarketplaceCard(raw.text);
-    const listing: RawListing = {
-      externalId: raw.externalId,
-      title: parsed.title,
-      url: raw.href,
-      price: parsed.price,
-      priceText: parsed.priceText,
-      currency: parsed.currency,
-      location: parsed.location,
-      imageUrl: raw.imageUrl,
-      sellerName: null,
-      description: null,
-      postedText: raw.text.join(' | '),
-      titleConfidence: parsed.titleConfidence,
-      parserNotes: parsed.parserNotes
-    };
-
-    if (!items.some((item) => item.externalId === listing.externalId)) {
-      items.push(listing);
+      if (!items.some((item) => item.externalId === listing.externalId)) {
+        items.push(listing);
+      }
     }
-  }
 
-  if (options.debug) {
-    console.log(`Collected ${items.length} cards for ${profile.id}`);
-  }
+    if (options.debug) {
+      options.logger.debug(`Profile ${profile.id}: collected ${items.length} unique card(s)`);
+    }
 
-  await page.close();
-  return items;
+    return items;
+  } finally {
+    await page.close();
+  }
 }
 
 export function parseMarketplaceCard(text: string[]): {
@@ -177,9 +205,24 @@ function looksLikeLocation(value: string): boolean {
     || /^[A-Za-z][A-Za-z\s'-]+$/.test(value) && value.split(/\s+/).length <= 3 && !/helmet|driver|watch|golf|bike|iphone|club/i.test(value);
 }
 
-async function autoScroll(page: import('playwright').Page): Promise<void> {
+async function autoScroll(page: import('playwright').Page, logger: Logger, profileId: string): Promise<void> {
   for (let i = 0; i < 3; i += 1) {
+    logger.debug(`Profile ${profileId}: scroll pass ${i + 1}/3`);
     await page.mouse.wheel(0, 3000);
     await page.waitForTimeout(1200);
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

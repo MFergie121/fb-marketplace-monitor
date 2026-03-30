@@ -15,6 +15,7 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
 - Generates Discord-friendly digest text for later delivery integrations, including title-confidence and parser risk flags
 - Detects suspicious empty runs and enforces a simple run lock
 - Supports a mock-data path so the full digest pipeline can be tested without live scraping
+- Emits step-level run logs so browser launch / profile progress / digest generation are visible during live runs
 
 ## Security / operational notes
 
@@ -63,12 +64,30 @@ Search profiles live in `config/search-profiles.json`:
 }
 ```
 
+Useful runtime knobs:
+
+- `FBM_DEBUG=true` enables verbose progress logs.
+- `FBM_PROFILE_TIMEOUT_MS=90000` caps how long one profile can hang before the run continues as `partial`.
+- `FBM_RUN_TIMEOUT_MS=300000` caps total run time.
+
 ## Manual run commands
 
 Live scrape:
 
 ```bash
 npm run run
+```
+
+Verbose live scrape:
+
+```bash
+npm run run -- --debug
+```
+
+Single-profile diagnostic run:
+
+```bash
+npm run run -- --profile golf-clubs-demo --debug
 ```
 
 Mock pipeline test:
@@ -84,6 +103,19 @@ npm run build
 npm run check
 ```
 
+## What you should now see during a live run
+
+Typical progress logging includes:
+
+- startup / config loaded
+- DB opened / run lock acquired
+- browser launch starting / browser launched
+- each profile starting / completed / failed / item count
+- digest generation
+- run finished / lock released
+
+If a profile stalls, the monitor should now fail that profile after `FBM_PROFILE_TIMEOUT_MS`, log the reason, and finish the overall run with `status=partial` instead of appearing silently frozen forever.
+
 ## Outputs
 
 - SQLite DB: `runtime/fbm.sqlite`
@@ -95,6 +127,7 @@ Digest rows now include:
 - parsed title-confidence (`high`, `medium`, `low`)
 - risk flags for weak titles / placeholder pricing
 - raw scoring reason codes so weak parses are visible instead of quietly ranking as strong finds
+- failed-profile summaries when a live scrape partially succeeds
 
 ## Suspicious-empty logic
 
@@ -111,3 +144,4 @@ If the number of suspicious profiles hits `FBM_SUSPICIOUS_EMPTY_MIN_PROFILES`, t
 - Marketplace DOM changes may still require selector tuning.
 - Seller/description fields are mostly unavailable from search cards and are stored when present in mock data or visible card text.
 - Parsing heuristics are deliberately lightweight; low-confidence rows are flagged rather than silently treated as trustworthy.
+- Per-profile timeouts reduce silent hangs, but a browser engine failure before launch can still fail the whole run early.

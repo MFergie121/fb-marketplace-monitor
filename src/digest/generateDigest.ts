@@ -7,8 +7,10 @@ export function generateDigest(input: {
   scored: ScoredObservation[];
   profiles: SearchProfile[];
   suspiciousProfiles: string[];
+  failedProfiles?: Record<string, string>;
 }): string {
   const top = [...input.scored].sort((a, b) => b.score - a.score).slice(0, 12);
+  const failedProfileIds = Object.keys(input.failedProfiles ?? {});
   const header = [
     `Facebook Marketplace monitor`,
     `Status: ${input.status}`,
@@ -20,6 +22,14 @@ export function generateDigest(input: {
   if (input.suspiciousProfiles.length > 0) {
     header.push(`Suspicious empty profiles: ${input.suspiciousProfiles.join(', ')}`);
   }
+
+  if (failedProfileIds.length > 0) {
+    header.push(`Failed profiles: ${failedProfileIds.join(', ')}`);
+  }
+
+  const failureBody = failedProfileIds.length === 0
+    ? []
+    : ['', 'Profile failures:', ...failedProfileIds.map((profileId) => `- ${profileId}: ${input.failedProfiles?.[profileId] ?? 'unknown error'}`)];
 
   const body = top.length === 0
     ? ['No listings scored this run.']
@@ -35,7 +45,7 @@ export function generateDigest(input: {
         return `${index + 1}. [${item.profileId}] ${item.title} — ${formatPrice(item.price, item.currency, item.priceText)} — score ${item.score}${flags ? ` — flags: ${flags}` : ''}\n   ${item.location ?? 'Unknown location'}\n   Title confidence: ${confidenceLabel}\n   Reasons: ${reasons || 'none'}\n   ${item.url}`;
       });
 
-  return [...header, '', ...body].join('\n');
+  return [...header, ...failureBody, '', ...body].join('\n');
 }
 
 function formatPrice(price?: number | null, currency?: string | null, priceText?: string | null): string {

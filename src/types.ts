@@ -75,6 +75,8 @@ export type RunResult = {
     profileId: string;
     collected: number;
     suspiciousEmpty: boolean;
+    status: 'success' | 'failed';
+    errorMessage: string | null;
   }>;
   digest: string;
 };

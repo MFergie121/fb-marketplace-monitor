@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { Logger } from '../logging.js';
 import type { AppConfig, ListingObservation, RawListing, RunResult, RunStatus, ScoredObservation } from '../types.js';
 import { collectMarketplaceListings } from '../collector/marketplaceCollector.js';
 import { openDatabase, migrate, createRun, finishRun, upsertListing, insertObservation, insertNotification, getRecentObservedCounts, cleanupOldData } from '../db/database.js';
@@ -13,36 +14,48 @@ export type RunOptions = {
   headless: boolean;
   navTimeoutMs: number;
   runTimeoutMs: number;
+  profileTimeoutMs: number;
   maxListingsPerProfile: number;
   retentionDays: number;
   emptyResultsThreshold: number;
   suspiciousEmptyMinProfiles: number;
   debug: boolean;
+  logger: Logger;
   mockPath?: string;
 };
 
 export async function runMonitor(config: AppConfig, options: RunOptions): Promise<RunResult> {
+  options.logger.info(`Opening DB at ${path.resolve(options.dbPath)}`);
   const db = openDatabase(options.dbPath);
   migrate(db);
   cleanupOldData(db, options.retentionDays);
+  options.logger.info(`DB ready, acquiring run lock marketplace-monitor (ttl ${options.runTimeoutMs}ms)`);
   acquireRunLock(db, 'marketplace-monitor', options.runTimeoutMs);
+  options.logger.info('Run lock acquired');
 
   const startedAt = new Date().toISOString();
   const runId = createRun(db, startedAt);
+  options.logger.info(`Run ${runId} created`);
 
   try {
     const observedAt = new Date().toISOString();
-    const profileItems = await withTimeout(loadItems(config, options), options.runTimeoutMs, 'Run timed out');
+    const collection = await withTimeout(loadItems(config, options), options.runTimeoutMs, 'Run timed out');
     const scored: ScoredObservation[] = [];
     const profileSummaries: RunResult['profileSummaries'] = [];
     const suspiciousProfiles: string[] = [];
 
     for (const profile of config.profiles.filter((item) => item.enabled)) {
-      const items = profileItems[profile.id] ?? [];
+      const items = collection.itemsByProfile[profile.id] ?? [];
       const priorCounts = getRecentObservedCounts(db, profile.id, options.emptyResultsThreshold);
       const suspiciousEmpty = items.length === 0 && priorCounts.some((count) => count > 0);
       if (suspiciousEmpty) suspiciousProfiles.push(profile.id);
-      profileSummaries.push({ profileId: profile.id, collected: items.length, suspiciousEmpty });
+      profileSummaries.push({
+        profileId: profile.id,
+        collected: items.length,
+        suspiciousEmpty,
+        status: collection.failures[profile.id] ? 'failed' : 'success',
+        errorMessage: collection.failures[profile.id] ?? null
+      });
 
       for (const item of items) {
         const observation: ListingObservation = { ...item, profileId: profile.id, observedAt };
@@ -55,17 +68,33 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
 
     const status: RunStatus = suspiciousProfiles.length >= options.suspiciousEmptyMinProfiles
       ? 'suspicious_empty'
-      : 'success';
+      : Object.keys(collection.failures).length > 0
+        ? 'partial'
+        : 'success';
     const finishedAt = new Date().toISOString();
-    const digest = generateDigest({ status, startedAt, finishedAt, scored, profiles: config.profiles.filter((item) => item.enabled), suspiciousProfiles });
+    options.logger.info('Generating digest');
+    const digest = generateDigest({
+      status,
+      startedAt,
+      finishedAt,
+      scored,
+      profiles: config.profiles.filter((item) => item.enabled),
+      suspiciousProfiles,
+      failedProfiles: collection.failures
+    });
     insertNotification(db, runId, digest);
     finishRun(db, runId, {
       status,
       finishedAt,
       suspiciousEmpty: suspiciousProfiles.length > 0,
-      metadata: { profileSummaries, digestPathHint: path.resolve('runtime/latest-digest.txt') }
+      metadata: {
+        profileSummaries,
+        failedProfiles: collection.failures,
+        digestPathHint: path.resolve('runtime/latest-digest.txt')
+      }
     });
 
+    options.logger.info(`Run ${runId} finished with status=${status}`);
     return { runId, status, startedAt, finishedAt, profileSummaries, digest };
   } catch (error) {
     const finishedAt = new Date().toISOString();
@@ -79,22 +108,30 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
     throw error;
   } finally {
     releaseRunLock(db, 'marketplace-monitor');
+    options.logger.info('Run lock released');
     db.close();
+    options.logger.info('DB closed');
   }
 }
 
-async function loadItems(config: AppConfig, options: RunOptions): Promise<Record<string, RawListing[]>> {
+async function loadItems(config: AppConfig, options: RunOptions): Promise<{ itemsByProfile: Record<string, RawListing[]>; failures: Record<string, string>; }> {
   if (options.mockPath) {
+    options.logger.info(`Loading mock data from ${options.mockPath}`);
     const mock = loadMockRun(options.mockPath);
-    return Object.fromEntries(mock.profiles.map((profile) => [profile.profileId, profile.items]));
+    return {
+      itemsByProfile: Object.fromEntries(mock.profiles.map((profile) => [profile.profileId, profile.items])),
+      failures: {}
+    };
   }
 
   return collectMarketplaceListings(config.profiles, {
     profileDir: options.browserProfileDir,
     headless: options.headless,
     navTimeoutMs: options.navTimeoutMs,
+    profileTimeoutMs: options.profileTimeoutMs,
     maxListingsPerProfile: options.maxListingsPerProfile,
-    debug: options.debug
+    debug: options.debug,
+    logger: options.logger
   });
 }
 
