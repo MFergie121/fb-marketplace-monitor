@@ -5,13 +5,31 @@
       "label": "Golf clubs",
       "url": "https://www.facebook.com/marketplace/melbourne/search?query=golf%20clubs",
       "enabled": true,
-      "category": "sporting-goods",
+      "category": "golf",
       "brandPreferences": ["TaylorMade", "Titleist", "Ping", "Callaway"],
       "modelFamilies": ["Stealth", "Paradym", "G430"],
       "keywords": ["driver", "irons", "set"],
       "unwantedKeywords": ["kids", "junior", "women's", "ladies"],
       "maxPrice": 1200,
-      "locationLabel": "Melbourne"
+      "locationLabel": "Melbourne",
+      "valuationReferences": [
+        {
+          "label": "TaylorMade Stealth driver",
+          "matchTerms": ["taylormade", "stealth", "driver"],
+          "priceLow": 320,
+          "priceHigh": 480,
+          "confidence": "high",
+          "notes": "Solid used-market band for Stealth drivers in decent condition"
+        },
+        {
+          "label": "Ping G430 driver",
+          "matchTerms": ["ping", "g430", "driver"],
+          "priceLow": 450,
+          "priceHigh": 650,
+          "confidence": "high",
+          "notes": "Premium current-generation Ping driver range"
+        }
+      ]
     },
     {
       "id": "watches-demo",

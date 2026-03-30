@@ -47,11 +47,21 @@ export function generateDigest(input: {
         const summaryBits = [
           item.location ?? 'Unknown location',
           item.condition ? `Condition: ${item.condition}` : null,
-          `Title confidence: ${confidenceLabel}`
+          `Title confidence: ${confidenceLabel}`,
+          `Valuation confidence: ${item.valuation.confidence}`
         ].filter(Boolean).join(' | ');
         const description = summarizeDescription(item.description);
+        const valuationSources = item.valuation.sources
+          .map((source) => `${source.source}:${source.label} ${source.priceLow}-${source.priceHigh}`)
+          .join('; ');
 
-        return `${index + 1}. [${item.profileId}] ${item.title} — ${formatPrice(item.price, item.currency, item.priceText)} — score ${item.score}${flags ? ` — flags: ${flags}` : ''}\n   ${summaryBits}\n   Reasons: ${reasons || 'none'}\n${description ? `   Description: ${description}\n` : ''}   ${item.url}`;
+        return `${index + 1}. [${item.profileId}] ${item.title} — ${formatPrice(item.price, item.currency, item.priceText)} — score ${item.score}${flags ? ` — flags: ${flags}` : ''}
+   ${summaryBits}
+   Value: ${capitalize(item.valuation.assessment)} — ${item.valuation.summary}
+${valuationSources ? `   Value sources: ${valuationSources}
+` : ''}   Reasons: ${reasons || 'none'}
+${description ? `   Description: ${description}
+` : ''}   ${item.url}`;
       });
 
   return [...header, ...failureBody, '', ...body].join('\n');
@@ -80,4 +90,8 @@ function summarizeDescription(description?: string | null): string | null {
   if (!description) return null;
   const compact = description.replace(/\s+/g, ' ').trim();
   return compact.length <= 180 ? compact : `${compact.slice(0, 177)}...`;
+}
+
+function capitalize(value: string): string {
+  return value ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}` : value;
 }

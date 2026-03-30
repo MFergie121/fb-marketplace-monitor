@@ -1,3 +1,40 @@
+export type ValuationAssessment = 'attractive' | 'fair' | 'uncertain' | 'overpriced';
+
+export type ValuationReference = {
+  label: string;
+  matchTerms: string[];
+  priceLow: number;
+  priceHigh: number;
+  confidence?: 'high' | 'medium' | 'low';
+  notes?: string;
+};
+
+export type ValuationHeuristicRule = {
+  key: string;
+  appliesWhen: string[];
+  referenceLow: number;
+  referenceHigh: number;
+  note: string;
+};
+
+export type ValuationSource = {
+  source: 'manual_reference' | 'category_heuristic' | 'local_baseline';
+  label: string;
+  priceLow: number;
+  priceHigh: number;
+  confidence: 'high' | 'medium' | 'low';
+  detail: string;
+};
+
+export type ValuationContext = {
+  assessment: ValuationAssessment;
+  summary: string;
+  price: number | null;
+  matchedReferenceLabel?: string;
+  confidence: 'high' | 'medium' | 'low';
+  sources: ValuationSource[];
+};
+
 export type SearchProfile = {
   id: string;
   label: string;
@@ -11,6 +48,7 @@ export type SearchProfile = {
   maxPrice?: number;
   minPrice?: number;
   locationLabel?: string;
+  valuationReferences?: ValuationReference[];
 };
 
 export type AppConfig = {
@@ -63,7 +101,11 @@ export type ScoreReasonCode =
   | 'SPEC_CUE'
   | 'SPECIFIC_LISTING'
   | 'SINGLE_ITEM_SIGNAL'
-  | 'VAGUE_LISTING';
+  | 'VAGUE_LISTING'
+  | 'VALUATION_ATTRACTIVE'
+  | 'VALUATION_FAIR'
+  | 'VALUATION_UNCERTAIN'
+  | 'VALUATION_OVERPRICED';
 
 export type ScoreReason = {
   code: ScoreReasonCode;
@@ -75,6 +117,7 @@ export type ScoredObservation = ListingObservation & {
   score: number;
   reasons: ScoreReason[];
   isNewListing: boolean;
+  valuation: ValuationContext;
 };
 
 export type RunStatus = 'success' | 'partial' | 'failed' | 'suspicious_empty';

@@ -1,25 +1,208 @@
 {
   "profiles": [
     {
-      "id": "golf-clubs-demo",
+      "id": "golf-clubs",
       "label": "Golf clubs",
-      "url": "https://www.facebook.com/marketplace/melbourne/search?query=golf%20clubs",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=Golf%20clubs",
       "enabled": true,
-      "category": "sporting-goods",
-      "brandPreferences": ["TaylorMade", "Titleist", "Ping", "Callaway"],
+      "category": "golf",
+      "brandPreferences": ["Callaway", "Ping", "TaylorMade", "Titleist"],
+      "modelFamilies": ["Stealth", "Stealth 2", "G430", "G425", "Paradym", "Ai Smoke", "T200", "P790"],
+      "maxPrice": 2000,
+      "keywords": ["golf", "clubs", "driver", "irons", "set", "putter", "wedge"],
+      "locationLabel": "Melbourne",
+      "valuationReferences": [
+        {
+          "label": "TaylorMade Stealth driver",
+          "matchTerms": ["taylormade", "stealth", "driver"],
+          "priceLow": 320,
+          "priceHigh": 480,
+          "confidence": "high",
+          "notes": "Used Stealth drivers in solid condition typically land in this band"
+        },
+        {
+          "label": "Ping G430 driver",
+          "matchTerms": ["ping", "g430", "driver"],
+          "priceLow": 450,
+          "priceHigh": 650,
+          "confidence": "high",
+          "notes": "Current-generation Ping drivers usually hold value strongly"
+        },
+        {
+          "label": "Callaway Paradym driver",
+          "matchTerms": ["callaway", "paradym", "driver"],
+          "priceLow": 420,
+          "priceHigh": 620,
+          "confidence": "high",
+          "notes": "Paradym drivers generally sit near premium used-driver pricing"
+        },
+        {
+          "label": "Players distance iron set",
+          "matchTerms": ["p790", "t200", "iron set"],
+          "priceLow": 700,
+          "priceHigh": 1300,
+          "confidence": "medium",
+          "notes": "Stronger iron-set reference for popular players-distance models"
+        }
+      ]
+    },
+    {
+      "id": "ping-driver",
+      "label": "Ping driver",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=ping%20driver",
+      "enabled": true,
+      "category": "golf",
+      "brandPreferences": ["Ping"],
+      "modelFamilies": ["G430", "G425", "G410"],
+      "maxPrice": 1000,
+      "keywords": ["ping", "driver", "g430", "g425", "g410"],
+      "locationLabel": "Melbourne",
+      "valuationReferences": [
+        {
+          "label": "Ping G430 driver",
+          "matchTerms": ["ping", "g430", "driver"],
+          "priceLow": 450,
+          "priceHigh": 650,
+          "confidence": "high",
+          "notes": "Ping G430 drivers remain premium on the used market"
+        },
+        {
+          "label": "Ping G425 driver",
+          "matchTerms": ["ping", "g425", "driver"],
+          "priceLow": 320,
+          "priceHigh": 480,
+          "confidence": "high",
+          "notes": "Ping G425 driver reference band"
+        }
+      ]
+    },
+    {
+      "id": "callaway-woods-driver",
+      "label": "Callaway woods / driver",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=callaway%20woods%20driver",
+      "enabled": true,
+      "category": "golf",
+      "brandPreferences": ["Callaway"],
+      "modelFamilies": ["Paradym", "Rogue", "Epic", "Ai Smoke"],
       "maxPrice": 1200,
-      "keywords": ["driver", "irons", "set"],
+      "keywords": ["callaway", "driver", "wood", "woods", "paradym", "rogue", "epic"],
+      "locationLabel": "Melbourne",
+      "valuationReferences": [
+        {
+          "label": "Callaway Paradym driver",
+          "matchTerms": ["callaway", "paradym", "driver"],
+          "priceLow": 420,
+          "priceHigh": 620,
+          "confidence": "high",
+          "notes": "Strong used-value band for Paradym drivers"
+        },
+        {
+          "label": "Callaway Rogue/Epic driver",
+          "matchTerms": ["callaway", "rogue", "driver"],
+          "priceLow": 240,
+          "priceHigh": 420,
+          "confidence": "medium",
+          "notes": "Older premium Callaway drivers usually land below Paradym"
+        }
+      ]
+    },
+    {
+      "id": "ski-helmets",
+      "label": "Ski helmets",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=ski%20helmets",
+      "enabled": true,
+      "category": "ski-helmet",
+      "brandPreferences": ["Oakley", "Giro", "POC"],
+      "maxPrice": 250,
+      "keywords": ["ski", "helmet", "snow", "mips"],
       "locationLabel": "Melbourne"
     },
     {
-      "id": "watches-demo",
-      "label": "Watches",
-      "url": "https://www.facebook.com/marketplace/melbourne/search?query=watch",
+      "id": "mens-ski-helmet",
+      "label": "Men's ski helmet",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=mens%20ski%20helmet",
       "enabled": true,
-      "category": "fashion",
-      "brandPreferences": ["Seiko", "Tissot", "Citizen", "Casio"],
-      "maxPrice": 600,
-      "keywords": ["automatic", "diver", "vintage"],
+      "category": "ski-helmet",
+      "brandPreferences": ["Oakley", "Giro", "POC"],
+      "maxPrice": 250,
+      "keywords": ["mens", "men's", "ski", "helmet", "mips"],
+      "locationLabel": "Melbourne"
+    },
+    {
+      "id": "mips-ski-helmet",
+      "label": "MIPS ski helmet",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=mips%20ski%20helmet",
+      "enabled": true,
+      "category": "ski-helmet",
+      "brandPreferences": ["Oakley", "Giro", "POC"],
+      "maxPrice": 300,
+      "keywords": ["mips", "ski", "helmet"],
+      "locationLabel": "Melbourne"
+    },
+    {
+      "id": "ski-goggles",
+      "label": "Ski goggles",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=ski%20goggles",
+      "enabled": true,
+      "category": "ski-goggles",
+      "brandPreferences": ["Oakley", "Smith", "Dragon"],
+      "maxPrice": 220,
+      "keywords": ["ski", "goggles", "snow", "lens"],
+      "locationLabel": "Melbourne"
+    },
+    {
+      "id": "mens-ski-goggles",
+      "label": "Men's ski goggles",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=mens%20ski%20goggles",
+      "enabled": true,
+      "category": "ski-goggles",
+      "brandPreferences": ["Oakley", "Smith", "Dragon"],
+      "maxPrice": 220,
+      "keywords": ["mens", "men's", "ski", "goggles", "lens"],
+      "locationLabel": "Melbourne"
+    },
+    {
+      "id": "mens-skis-170-180",
+      "label": "Men's skis 170-180",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=men%E2%80%99s%20skis%20170%E2%80%93180",
+      "enabled": true,
+      "category": "skis",
+      "brandPreferences": ["Salomon", "K2", "Rossignol", "Atomic", "Black Crows", "Volkl"],
+      "maxPrice": 900,
+      "keywords": ["skis", "170", "175", "178", "180", "all mountain", "twin tip"],
+      "locationLabel": "Melbourne"
+    },
+    {
+      "id": "twin-tip-all-mountain-skis",
+      "label": "Twin tip all mountain skis",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=twin%20tip%20all%20mountain%20skis",
+      "enabled": true,
+      "category": "skis",
+      "brandPreferences": ["Salomon", "K2", "Rossignol", "Atomic", "Black Crows", "Volkl"],
+      "maxPrice": 1000,
+      "keywords": ["twin tip", "all mountain", "skis", "park", "freestyle"],
+      "locationLabel": "Melbourne"
+    },
+    {
+      "id": "portable-fishing-rods",
+      "label": "Portable fishing rods",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=portable%20fishing%20rods",
+      "enabled": true,
+      "category": "fishing",
+      "brandPreferences": [],
+      "maxPrice": 250,
+      "keywords": ["portable", "travel", "telescopic", "fishing", "rod"],
+      "locationLabel": "Melbourne"
+    },
+    {
+      "id": "philips-oneblade",
+      "label": "Philips OneBlade",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=phillips%20one%20blade",
+      "enabled": true,
+      "category": "grooming",
+      "brandPreferences": ["Philips", "Phillips"],
+      "maxPrice": 120,
+      "keywords": ["philips", "phillips", "oneblade", "trimmer", "shaver"],
       "locationLabel": "Melbourne"
     }
   ]

@@ -266,7 +266,18 @@ function shortlistForEnrichment(profile: SearchProfile, items: RawListing[], top
   return [...items]
     .map((item) => ({
       item,
-      score: scoreListing({ ...item, profileId: profile.id, observedAt: new Date(0).toISOString() }, profile, false).score
+      score: scoreListing(
+        { ...item, profileId: profile.id, observedAt: new Date(0).toISOString() },
+        profile,
+        false,
+        {
+          assessment: 'uncertain',
+          summary: 'Pre-enrichment shortlist uses non-valuation scoring only',
+          price: item.price ?? null,
+          confidence: 'low',
+          sources: []
+        }
+      ).score
     }))
     .sort((left, right) => right.score - left.score)
     .slice(0, topN)

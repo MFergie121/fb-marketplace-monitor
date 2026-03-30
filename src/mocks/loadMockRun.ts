@@ -18,6 +18,8 @@ const schema = z.object({
       sellerName: z.string().nullable().optional(),
       description: z.string().nullable().optional(),
       postedText: z.string().nullable().optional(),
+      condition: z.string().nullable().optional(),
+      detailCollectedAt: z.string().nullable().optional(),
       titleConfidence: z.enum(['high', 'medium', 'low']).optional(),
       parserNotes: z.array(z.string()).optional()
     }))

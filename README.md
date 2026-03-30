@@ -11,9 +11,10 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
 - Shortlists a small configurable top-N per profile and opens detail pages to capture richer fields, especially description text
 - Stores runs, listings, observations, and digest previews in SQLite
 - Scores listings deterministically with explicit reason codes
+- Adds valuation-aware scoring using manual references, category heuristics, and lightweight local DB baselines
 - Penalises noisy patterns such as placeholder prices, `from $X`, `each`, quick-sale language, bulk/mixed bundles, and profile-configured unwanted variants
 - Boosts exact brands, configured model families, cleaner single-item listings, and relevant spec cues found in title or description
-- Generates Discord-friendly digest text with score explanations and description snippets for enriched items
+- Generates Discord-friendly digest text with score explanations, valuation summaries (`attractive`, `fair`, `uncertain`, `overpriced`), and description snippets for enriched items
 - Detects suspicious empty runs and enforces a simple run lock
 - Supports a mock-data path so the full digest pipeline can be tested without live scraping
 - Emits step-level run logs so browser launch / profile progress / enrichment / digest generation are visible during live runs
@@ -67,6 +68,28 @@ Search profiles live in `config/search-profiles.json`:
   ]
 }
 ```
+
+### Valuation references
+
+Each profile can optionally define `valuationReferences` to anchor known used-market bands for important models. This is the main MVP path for golf:
+
+```json
+{
+  "label": "Ping G430 driver",
+  "matchTerms": ["ping", "g430", "driver"],
+  "priceLow": 450,
+  "priceHigh": 650,
+  "confidence": "high",
+  "notes": "Premium current-generation Ping driver range"
+}
+```
+
+How valuation works:
+
+- `valuationReferences`: strongest signal when a known model/category match exists
+- category heuristics: fallback used-value bands for `golf`, `skis`, `ski-goggles`, and `ski-helmet`
+- local observed baseline: lightweight median-based band from similar historical observations already in SQLite
+- final digest output explains which sources were used and whether the price looks `attractive`, `fair`, `uncertain`, or `overpriced`
 
 Useful runtime knobs:
 
@@ -134,6 +157,7 @@ Digest rows now include:
 - parsed title-confidence (`high`, `medium`, `low`)
 - risk flags for weak titles / placeholder pricing / detail enrichment
 - raw scoring reason codes with weights
+- valuation summary + supporting value sources/ranges
 - short description snippets when available
 - failed-profile summaries when a live scrape partially succeeds
 

@@ -1,4 +1,4 @@
-import type { ListingObservation, ScoreReason, ScoredObservation, SearchProfile } from '../types.js';
+import type { ListingObservation, ScoreReason, ScoredObservation, SearchProfile, ValuationContext } from '../types.js';
 
 const SPEC_PATTERNS: Array<{ pattern: RegExp; detail: string; weight: number }> = [
   { pattern: /\b(\d{2,3}(?:\.\d)?\s?cm)\b/i, detail: 'Length spec present', weight: 6 },
@@ -9,7 +9,12 @@ const SPEC_PATTERNS: Array<{ pattern: RegExp; detail: string; weight: number }> 
   { pattern: /\b(10\.5|9\.0|170|175|180)\b/i, detail: 'Model/spec number present', weight: 4 }
 ];
 
-export function scoreListing(observation: ListingObservation, profile: SearchProfile, isNewListing: boolean): ScoredObservation {
+export function scoreListing(
+  observation: ListingObservation,
+  profile: SearchProfile,
+  isNewListing: boolean,
+  valuation: ValuationContext
+): ScoredObservation {
   const reasons: ScoreReason[] = [];
   const title = normalize(observation.title);
   const description = normalize(observation.description);
@@ -112,14 +117,31 @@ export function scoreListing(observation: ListingObservation, profile: SearchPro
     reasons.push(cue);
   }
 
+  reasons.push(...valuationReasons(valuation));
+
   const score = reasons.reduce((sum, reason) => sum + reason.weight, 0);
 
   return {
     ...observation,
     score,
     reasons,
-    isNewListing
+    isNewListing,
+    valuation
   };
+}
+
+function valuationReasons(valuation: ValuationContext): ScoreReason[] {
+  switch (valuation.assessment) {
+    case 'attractive':
+      return [{ code: 'VALUATION_ATTRACTIVE', weight: 28, detail: valuation.summary }];
+    case 'fair':
+      return [{ code: 'VALUATION_FAIR', weight: 8, detail: valuation.summary }];
+    case 'overpriced':
+      return [{ code: 'VALUATION_OVERPRICED', weight: -22, detail: valuation.summary }];
+    case 'uncertain':
+    default:
+      return [{ code: 'VALUATION_UNCERTAIN', weight: -4, detail: valuation.summary }];
+  }
 }
 
 function normalize(value?: string | null): string {

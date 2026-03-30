@@ -7,6 +7,7 @@ import { generateDigest } from '../digest/generateDigest.js';
 import { loadMockRun } from '../mocks/loadMockRun.js';
 import { acquireRunLock, releaseRunLock } from './lock.js';
 import { scoreListing } from '../scoring/scoreListings.js';
+import { buildValuationContext } from '../scoring/valuation.js';
 
 export type RunOptions = {
   dbPath: string;
@@ -62,8 +63,9 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
 
       for (const item of items) {
         const observation: ListingObservation = { ...item, profileId: profile.id, observedAt };
+        const valuation = buildValuationContext(db, observation, profile);
         const { listingId, isNew } = upsertListing(db, observation);
-        const scoredObservation = scoreListing(observation, profile, isNew);
+        const scoredObservation = scoreListing(observation, profile, isNew, valuation);
         insertObservation(db, runId, listingId, scoredObservation);
         scored.push(scoredObservation);
       }
