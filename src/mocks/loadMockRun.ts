@@ -11,12 +11,15 @@ const schema = z.object({
       title: z.string(),
       url: z.string(),
       price: z.number().nullable().optional(),
+      priceText: z.string().nullable().optional(),
       currency: z.string().nullable().optional(),
       location: z.string().nullable().optional(),
       imageUrl: z.string().nullable().optional(),
       sellerName: z.string().nullable().optional(),
       description: z.string().nullable().optional(),
-      postedText: z.string().nullable().optional()
+      postedText: z.string().nullable().optional(),
+      titleConfidence: z.enum(['high', 'medium', 'low']).optional(),
+      parserNotes: z.array(z.string()).optional()
     }))
   }))
 });

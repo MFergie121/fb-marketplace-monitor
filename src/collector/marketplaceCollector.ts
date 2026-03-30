@@ -1,5 +1,5 @@
 import { chromium, type BrowserContext } from 'playwright';
-import type { RawListing, SearchProfile } from '../types.js';
+import type { RawListing, SearchProfile, TitleConfidence } from '../types.js';
 
 export type CollectorOptions = {
   profileDir: string;
@@ -48,26 +48,33 @@ async function collectProfile(context: BrowserContext, profile: SearchProfile, o
       const href = el.href;
       const externalIdMatch = href.match(/\/item\/(\d+)/);
       const image = el.querySelector('img');
-      const title = text.find((part) => !/^\$/.test(part)) ?? text[0] ?? 'Untitled listing';
-      const priceCandidate = text.find((part) => /\$\s?\d/.test(part));
-      const price = priceCandidate ? Number(priceCandidate.replace(/[^\d.]/g, '')) : null;
-      const location = text.at(-1) ?? null;
       return {
         externalId: externalIdMatch?.[1] ?? href,
-        title,
-        url: href,
-        price: Number.isFinite(price) ? price : null,
-        currency: priceCandidate ? 'AUD' : null,
-        location,
-        imageUrl: image?.getAttribute('src') ?? null,
-        sellerName: null,
-        description: null,
-        postedText: text.join(' | ')
+        text,
+        href,
+        imageUrl: image?.getAttribute('src') ?? null
       };
     });
 
-    if (!items.some((item) => item.externalId === raw.externalId)) {
-      items.push(raw);
+    const parsed = parseMarketplaceCard(raw.text);
+    const listing: RawListing = {
+      externalId: raw.externalId,
+      title: parsed.title,
+      url: raw.href,
+      price: parsed.price,
+      priceText: parsed.priceText,
+      currency: parsed.currency,
+      location: parsed.location,
+      imageUrl: raw.imageUrl,
+      sellerName: null,
+      description: null,
+      postedText: raw.text.join(' | '),
+      titleConfidence: parsed.titleConfidence,
+      parserNotes: parsed.parserNotes
+    };
+
+    if (!items.some((item) => item.externalId === listing.externalId)) {
+      items.push(listing);
     }
   }
 
@@ -77,6 +84,97 @@ async function collectProfile(context: BrowserContext, profile: SearchProfile, o
 
   await page.close();
   return items;
+}
+
+export function parseMarketplaceCard(text: string[]): {
+  title: string;
+  price: number | null;
+  priceText: string | null;
+  currency: string | null;
+  location: string | null;
+  titleConfidence: TitleConfidence;
+  parserNotes: string[];
+} {
+  const lines = text.map((line) => line.trim()).filter(Boolean);
+  const parserNotes: string[] = [];
+  const priceLine = lines.find(isPriceLine) ?? null;
+  const price = parsePrice(priceLine);
+  const titleCandidates = lines.filter((line) => !isPriceLine(line) && !isMetaLine(line) && !looksLikeLocation(line));
+  let title = titleCandidates.find((line) => line.length >= 4) ?? titleCandidates[0] ?? lines.find((line) => !isPriceLine(line) && !isMetaLine(line)) ?? lines[0] ?? 'Untitled listing';
+  let titleConfidence: TitleConfidence = 'high';
+
+  if (!titleCandidates.length) {
+    parserNotes.push('title_fallback_no_clean_candidate');
+    titleConfidence = 'low';
+  }
+
+  if (isPriceLine(title)) {
+    parserNotes.push('title_looks_like_price');
+    titleConfidence = 'low';
+  }
+
+  if (title.length < 5 || /^\d+[a-z]?$/i.test(title)) {
+    parserNotes.push('title_too_short_or_numeric');
+    titleConfidence = titleConfidence === 'low' ? 'low' : 'medium';
+  }
+
+  const locationCandidates = lines.filter((line) => !isPriceLine(line) && !isMetaLine(line) && line !== title && looksLikeLocation(line));
+  const location = locationCandidates.at(-1) ?? null;
+
+  if (!location && lines.length > 1) {
+    const tail = lines.at(-1) ?? null;
+    if (tail && tail !== title && !isPriceLine(tail) && !isMetaLine(tail)) {
+      parserNotes.push('location_tail_fallback');
+    }
+  }
+
+  if (priceLine && title === priceLine) {
+    title = titleCandidates[1] ?? titleCandidates[0] ?? 'Untitled listing';
+    parserNotes.push('title_replaced_from_price_line');
+    titleConfidence = title === 'Untitled listing' ? 'low' : 'medium';
+  }
+
+  if (title === 'Untitled listing') {
+    parserNotes.push('title_missing');
+    titleConfidence = 'low';
+  }
+
+  return {
+    title,
+    price,
+    priceText: priceLine,
+    currency: priceLine && /\$|aud/i.test(priceLine) ? 'AUD' : null,
+    location,
+    titleConfidence,
+    parserNotes
+  };
+}
+
+function isPriceLine(value: string): boolean {
+  return /^(?:au\$|\$)\s*\d[\d,.]*(?:\.\d{2})?$/i.test(value)
+    || /^free$/i.test(value)
+    || /^\d{1,3}(?:,\d{3})*(?:\.\d{2})?$/.test(value);
+}
+
+function parsePrice(value: string | null): number | null {
+  if (!value) return null;
+  if (/^free$/i.test(value)) return 0;
+  const numeric = Number(value.replace(/[^\d.]/g, ''));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function isMetaLine(value: string): boolean {
+  return /^(listed|shipping|seller|condition|available|in stock|minutes?|hours?|days?|weeks?)\b/i.test(value)
+    || /\bago\b/i.test(value)
+    || /^shared with/i.test(value)
+    || /^details$/i.test(value);
+}
+
+function looksLikeLocation(value: string): boolean {
+  return /,\s*[A-Z]{2,3}$/i.test(value)
+    || /\bvic\b|\bnsw\b|\bqld\b|\bsa\b|\bwa\b|\btas\b|\bact\b|\bnt\b/i.test(value)
+    || /^\d+\s?km$/i.test(value)
+    || /^[A-Za-z][A-Za-z\s'-]+$/.test(value) && value.split(/\s+/).length <= 3 && !/helmet|driver|watch|golf|bike|iphone|club/i.test(value);
 }
 
 async function autoScroll(page: import('playwright').Page): Promise<void> {

@@ -8,9 +8,11 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
   - `/Users/maxfergie/.openclaw/browser-profiles/fb-marketplace-monitor`
 - Reads config-driven Marketplace search profiles from JSON
 - Collects visible listing cards from Marketplace search pages
+- Applies lightweight parsing heuristics to separate title, price, and location from card text
 - Stores runs, listings, observations, and digest previews in SQLite
 - Scores listings deterministically with explicit reason codes
-- Generates Discord-friendly digest text for later delivery integrations
+- Penalises obvious placeholder/bait prices like `$1`, `Free`, or synthetic numeric placeholders such as `1234`
+- Generates Discord-friendly digest text for later delivery integrations, including title-confidence and parser risk flags
 - Detects suspicious empty runs and enforces a simple run lock
 - Supports a mock-data path so the full digest pipeline can be tested without live scraping
 
@@ -88,6 +90,12 @@ npm run check
 - Latest digest preview: `runtime/latest-digest.txt`
 - Generated digest copies are also stored in `notifications` for later integration work.
 
+Digest rows now include:
+
+- parsed title-confidence (`high`, `medium`, `low`)
+- risk flags for weak titles / placeholder pricing
+- raw scoring reason codes so weak parses are visible instead of quietly ranking as strong finds
+
 ## Suspicious-empty logic
 
 A profile is marked suspicious-empty when:
@@ -100,5 +108,6 @@ If the number of suspicious profiles hits `FBM_SUSPICIOUS_EMPTY_MIN_PROFILES`, t
 ## Notes / limitations
 
 - Collector intentionally targets visible listing cards only for MVP safety and simplicity.
-- Marketplace DOM changes may require selector tuning.
+- Marketplace DOM changes may still require selector tuning.
 - Seller/description fields are mostly unavailable from search cards and are stored when present in mock data or visible card text.
+- Parsing heuristics are deliberately lightweight; low-confidence rows are flagged rather than silently treated as trustworthy.

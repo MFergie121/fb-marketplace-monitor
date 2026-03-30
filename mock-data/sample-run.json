@@ -8,24 +8,45 @@
           "title": "TaylorMade Stealth Driver 10.5",
           "url": "https://www.facebook.com/marketplace/item/mock-golf-1",
           "price": 350,
+          "priceText": "AU$350",
           "currency": "AUD",
           "location": "Richmond, VIC",
           "imageUrl": "https://example.com/driver.jpg",
           "sellerName": "Sam",
           "description": "Very good condition. Includes headcover.",
-          "postedText": "Listed 2 hours ago"
+          "postedText": "Listed 2 hours ago",
+          "titleConfidence": "high",
+          "parserNotes": []
         },
         {
           "externalId": "mock-golf-2",
           "title": "Generic golf club bag",
           "url": "https://www.facebook.com/marketplace/item/mock-golf-2",
           "price": 120,
+          "priceText": "AU$120",
           "currency": "AUD",
           "location": "Brunswick, VIC",
           "imageUrl": "https://example.com/bag.jpg",
           "sellerName": "Alex",
           "description": "Used bag.",
-          "postedText": "Listed yesterday"
+          "postedText": "Listed yesterday",
+          "titleConfidence": "high",
+          "parserNotes": []
+        },
+        {
+          "externalId": "mock-golf-3",
+          "title": "AU$1",
+          "url": "https://www.facebook.com/marketplace/item/mock-golf-3",
+          "price": 1,
+          "priceText": "AU$1",
+          "currency": "AUD",
+          "location": "Melbourne, VIC",
+          "imageUrl": "https://example.com/mystery.jpg",
+          "sellerName": "Pat",
+          "description": "Need gone asap",
+          "postedText": "AU$1 | Melbourne, VIC",
+          "titleConfidence": "low",
+          "parserNotes": ["title_looks_like_price", "title_fallback_no_clean_candidate"]
         }
       ]
     },
@@ -37,12 +58,15 @@
           "title": "Seiko 5 Sports Automatic",
           "url": "https://www.facebook.com/marketplace/item/mock-watch-1",
           "price": 220,
+          "priceText": "AU$220",
           "currency": "AUD",
           "location": "Carlton, VIC",
           "imageUrl": "https://example.com/watch.jpg",
           "sellerName": "Jordan",
           "description": "Automatic Seiko in working condition.",
-          "postedText": "Listed today"
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
         }
       ]
     }

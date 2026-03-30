@@ -19,12 +19,20 @@ export function scoreListing(observation: ListingObservation, profile: SearchPro
   }
 
   if (typeof observation.price === 'number') {
+    if (typeof profile.minPrice === 'number' && observation.price < profile.minPrice) {
+      reasons.push({ code: 'SUSPICIOUS_PRICE_PATTERN', weight: -8, detail: `Price ${observation.price} is below min ${profile.minPrice}` });
+    }
+
     if (typeof profile.maxPrice === 'number') {
       if (observation.price <= profile.maxPrice) {
         reasons.push({ code: 'PRICE_UNDER_MAX', weight: 20, detail: `Price ${observation.price} <= max ${profile.maxPrice}` });
       } else {
         reasons.push({ code: 'PRICE_OVER_MAX', weight: -15, detail: `Price ${observation.price} > max ${profile.maxPrice}` });
       }
+    }
+
+    if (looksLikePlaceholderPrice(observation.price, observation.priceText)) {
+      reasons.push({ code: 'PLACEHOLDER_PRICE', weight: -30, detail: `Placeholder/bait price detected: ${observation.priceText ?? observation.price}` });
     }
   } else {
     reasons.push({ code: 'MISSING_PRICE', weight: -5, detail: 'Price missing from listing card' });
@@ -38,6 +46,20 @@ export function scoreListing(observation: ListingObservation, profile: SearchPro
     reasons.push({ code: 'LOCATION_MATCH', weight: 5, detail: `Location mentions ${profile.locationLabel}` });
   }
 
+  if (observation.titleConfidence === 'low') {
+    reasons.push({ code: 'LOW_TITLE_CONFIDENCE', weight: -35, detail: 'Card title parse confidence is low' });
+  } else if (observation.titleConfidence === 'medium') {
+    reasons.push({ code: 'LOW_TITLE_CONFIDENCE', weight: -12, detail: 'Card title parse confidence is medium' });
+  }
+
+  if (observation.parserNotes?.includes('title_fallback_no_clean_candidate') || observation.parserNotes?.includes('title_missing')) {
+    reasons.push({ code: 'TITLE_PARSE_FALLBACK', weight: -18, detail: `Title fallback used (${observation.parserNotes.join(', ')})` });
+  }
+
+  if (observation.parserNotes?.includes('title_looks_like_price') || observation.parserNotes?.includes('title_replaced_from_price_line')) {
+    reasons.push({ code: 'TITLE_LOOKS_LIKE_PRICE', weight: -25, detail: 'Title looked like a price or had to be replaced from price line' });
+  }
+
   const score = reasons.reduce((sum, reason) => sum + reason.weight, 0);
 
   return {
@@ -46,4 +68,15 @@ export function scoreListing(observation: ListingObservation, profile: SearchPro
     reasons,
     isNewListing
   };
+}
+
+function looksLikePlaceholderPrice(price: number, priceText?: string | null): boolean {
+  if (price <= 1) return true;
+  if (priceText && /^free$/i.test(priceText)) return true;
+
+  const digits = String(Math.trunc(price));
+  if (/^(1234|1111|2222|3333|4444|5555|9999)$/.test(digits)) return true;
+  if (/^(12|123|1234|12345)$/.test(digits)) return true;
+
+  return false;
 }

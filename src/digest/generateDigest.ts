@@ -25,13 +25,34 @@ export function generateDigest(input: {
     ? ['No listings scored this run.']
     : top.map((item, index) => {
         const reasons = item.reasons.map((reason) => reason.code).join(', ');
-        return `${index + 1}. [${item.profileId}] ${item.title} — ${formatPrice(item.price, item.currency)} — score ${item.score}\n   ${item.location ?? 'Unknown location'}\n   Reasons: ${reasons || 'none'}\n   ${item.url}`;
+        const confidenceLabel = formatConfidence(item.titleConfidence);
+        const flags = [
+          item.titleConfidence === 'low' ? 'weak-title' : null,
+          item.reasons.some((reason) => reason.code === 'PLACEHOLDER_PRICE') ? 'placeholder-price' : null,
+          item.reasons.some((reason) => reason.code === 'TITLE_LOOKS_LIKE_PRICE') ? 'title-from-price-risk' : null
+        ].filter(Boolean).join(', ');
+
+        return `${index + 1}. [${item.profileId}] ${item.title} — ${formatPrice(item.price, item.currency, item.priceText)} — score ${item.score}${flags ? ` — flags: ${flags}` : ''}\n   ${item.location ?? 'Unknown location'}\n   Title confidence: ${confidenceLabel}\n   Reasons: ${reasons || 'none'}\n   ${item.url}`;
       });
 
   return [...header, '', ...body].join('\n');
 }
 
-function formatPrice(price?: number | null, currency?: string | null): string {
+function formatPrice(price?: number | null, currency?: string | null, priceText?: string | null): string {
+  if (priceText && /^free$/i.test(priceText)) return 'Free';
   if (typeof price !== 'number') return 'Price n/a';
   return `${currency ?? 'AUD'} ${price}`;
+}
+
+function formatConfidence(confidence?: 'high' | 'medium' | 'low'): string {
+  switch (confidence) {
+    case 'high':
+      return 'high';
+    case 'medium':
+      return 'medium';
+    case 'low':
+      return 'low';
+    default:
+      return 'unknown';
+  }
 }

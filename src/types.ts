@@ -15,17 +15,22 @@ export type AppConfig = {
   profiles: SearchProfile[];
 };
 
+export type TitleConfidence = 'high' | 'medium' | 'low';
+
 export type RawListing = {
   externalId: string;
   title: string;
   url: string;
   price?: number | null;
+  priceText?: string | null;
   currency?: string | null;
   location?: string | null;
   imageUrl?: string | null;
   sellerName?: string | null;
   description?: string | null;
   postedText?: string | null;
+  titleConfidence?: TitleConfidence;
+  parserNotes?: string[];
 };
 
 export type ListingObservation = RawListing & {
@@ -40,7 +45,12 @@ export type ScoreReasonCode =
   | 'PRICE_OVER_MAX'
   | 'MISSING_PRICE'
   | 'NEW_LISTING'
-  | 'LOCATION_MATCH';
+  | 'LOCATION_MATCH'
+  | 'LOW_TITLE_CONFIDENCE'
+  | 'TITLE_PARSE_FALLBACK'
+  | 'TITLE_LOOKS_LIKE_PRICE'
+  | 'PLACEHOLDER_PRICE'
+  | 'SUSPICIOUS_PRICE_PATTERN';
 
 export type ScoreReason = {
   code: ScoreReasonCode;
