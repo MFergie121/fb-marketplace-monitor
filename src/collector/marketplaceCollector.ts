@@ -1,5 +1,6 @@
-import { chromium, type BrowserContext } from 'playwright';
+import { chromium, type BrowserContext, type Page } from 'playwright';
 import type { Logger } from '../logging.js';
+import { scoreListing } from '../scoring/scoreListings.js';
 import type { RawListing, SearchProfile, TitleConfidence } from '../types.js';
 
 export type CollectorOptions = {
@@ -8,11 +9,13 @@ export type CollectorOptions = {
   navTimeoutMs: number;
   profileTimeoutMs: number;
   maxListingsPerProfile: number;
+  detailEnrichmentTopN: number;
+  detailWaitMs: number;
   debug: boolean;
   logger: Logger;
 };
 
-export async function collectMarketplaceListings(profiles: SearchProfile[], options: CollectorOptions): Promise<{ itemsByProfile: Record<string, RawListing[]>; failures: Record<string, string>; }> {
+export async function collectMarketplaceListings(profiles: SearchProfile[], options: CollectorOptions): Promise<{ itemsByProfile: Record<string, RawListing[]>; failures: Record<string, string>; enrichmentCounts: Record<string, number>; }> {
   options.logger.info(`Browser launch starting (profile=${options.profileDir}, headless=${options.headless})`);
   const context = await chromium.launchPersistentContext(options.profileDir, {
     channel: 'chrome',
@@ -24,6 +27,8 @@ export async function collectMarketplaceListings(profiles: SearchProfile[], opti
   try {
     const itemsByProfile: Record<string, RawListing[]> = {};
     const failures: Record<string, string> = {};
+    const enrichmentCounts: Record<string, number> = {};
+
     for (const profile of profiles.filter((item) => item.enabled)) {
       options.logger.info(`Profile ${profile.id} starting`);
       try {
@@ -32,16 +37,30 @@ export async function collectMarketplaceListings(profiles: SearchProfile[], opti
           options.profileTimeoutMs,
           `Profile ${profile.id} timed out after ${options.profileTimeoutMs}ms`
         );
+
         itemsByProfile[profile.id] = items;
+        enrichmentCounts[profile.id] = 0;
+
         options.logger.info(`Profile ${profile.id} completed with ${items.length} item(s)`);
+
+        if (options.detailEnrichmentTopN > 0 && items.length > 0) {
+          const shortlist = shortlistForEnrichment(profile, items, options.detailEnrichmentTopN);
+          if (shortlist.length > 0) {
+            options.logger.info(`Profile ${profile.id}: enriching ${shortlist.length} shortlisted item(s)`);
+            enrichmentCounts[profile.id] = await enrichShortlistedItems(context, profile, items, shortlist, options);
+            options.logger.info(`Profile ${profile.id}: enriched ${enrichmentCounts[profile.id]} item(s)`);
+          }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         failures[profile.id] = message;
         itemsByProfile[profile.id] = [];
+        enrichmentCounts[profile.id] = 0;
         options.logger.warn(`Profile ${profile.id} failed: ${message}`);
       }
     }
-    return { itemsByProfile, failures };
+
+    return { itemsByProfile, failures, enrichmentCounts };
   } finally {
     options.logger.info('Closing browser context');
     await context.close();
@@ -95,6 +114,8 @@ async function collectProfile(context: BrowserContext, profile: SearchProfile, o
         sellerName: null,
         description: null,
         postedText: raw.text.join(' | '),
+        condition: null,
+        detailCollectedAt: null,
         titleConfidence: parsed.titleConfidence,
         parserNotes: parsed.parserNotes
       };
@@ -112,6 +133,151 @@ async function collectProfile(context: BrowserContext, profile: SearchProfile, o
   } finally {
     await page.close();
   }
+}
+
+async function enrichShortlistedItems(
+  context: BrowserContext,
+  profile: SearchProfile,
+  allItems: RawListing[],
+  shortlist: RawListing[],
+  options: CollectorOptions
+): Promise<number> {
+  let enriched = 0;
+
+  for (const candidate of shortlist) {
+    try {
+      const detail = await withTimeout(
+        collectListingDetail(context, candidate.url, profile.id, options),
+        Math.max(15_000, Math.min(options.profileTimeoutMs, options.navTimeoutMs * 2)),
+        `Detail enrichment timed out for ${candidate.externalId}`
+      );
+
+      const target = allItems.find((item) => item.externalId === candidate.externalId);
+      if (!target) continue;
+
+      if (detail.description) target.description = detail.description;
+      if (detail.location) target.location = detail.location;
+      if (detail.sellerName) target.sellerName = detail.sellerName;
+      if (detail.condition) target.condition = detail.condition;
+      if (detail.postedText) target.postedText = mergePostedText(target.postedText, detail.postedText);
+      target.detailCollectedAt = new Date().toISOString();
+      enriched += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      options.logger.warn(`Profile ${profile.id}: detail enrichment failed for ${candidate.externalId}: ${message}`);
+    }
+  }
+
+  return enriched;
+}
+
+async function collectListingDetail(context: BrowserContext, url: string, profileId: string, options: CollectorOptions): Promise<Partial<RawListing>> {
+  const page = await context.newPage();
+  page.setDefaultNavigationTimeout(options.navTimeoutMs);
+  page.setDefaultTimeout(options.navTimeoutMs);
+
+  try {
+    options.logger.debug(`Profile ${profileId}: opening detail ${url}`);
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(options.detailWaitMs);
+    await clickSeeMoreButtons(page);
+
+    const detail = await page.evaluate(() => {
+      const text = document.body.innerText
+        .split('\n')
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+      const description = extractDescription(text);
+      const condition = extractFieldValue(text, ['Condition']);
+      const sellerName = extractSellerName(text);
+      const location = extractLocation(text);
+      const postedText = extractPostedText(text);
+
+      return {
+        description,
+        condition,
+        sellerName,
+        location,
+        postedText
+      };
+
+      function extractDescription(lines: string[]): string | null {
+        const startIndex = lines.findIndex((line) => /^description$/i.test(line));
+        if (startIndex === -1) return null;
+        const collected: string[] = [];
+        for (let index = startIndex + 1; index < lines.length; index += 1) {
+          const line = lines[index];
+          if (/^(condition|seller information|seller details|listed|location|message|details|category)$/i.test(line)) break;
+          if (/^(marketplace|share|save|send seller a message)$/i.test(line)) break;
+          collected.push(line);
+          if (collected.length >= 8) break;
+        }
+        return collected.length > 0 ? collected.join(' ').slice(0, 1500) : null;
+      }
+
+      function extractFieldValue(lines: string[], labels: string[]): string | null {
+        for (const label of labels) {
+          const index = lines.findIndex((line) => line.toLowerCase() === label.toLowerCase());
+          if (index !== -1) {
+            const next = lines[index + 1];
+            if (next && next.toLowerCase() !== label.toLowerCase()) return next.slice(0, 200);
+          }
+        }
+        return null;
+      }
+
+      function extractSellerName(lines: string[]): string | null {
+        const idx = lines.findIndex((line) => /^seller details$/i.test(line) || /^seller information$/i.test(line));
+        if (idx !== -1) {
+          const next = lines[idx + 1];
+          if (next) return next.slice(0, 200);
+        }
+        return null;
+      }
+
+      function extractLocation(lines: string[]): string | null {
+        const explicit = extractFieldValue(lines, ['Location']);
+        if (explicit) return explicit;
+        return lines.find((line) => /,\s*(VIC|NSW|QLD|SA|WA|TAS|ACT|NT)\b/i.test(line)) ?? null;
+      }
+
+      function extractPostedText(lines: string[]): string | null {
+        return lines.find((line) => /\b(listed|ago|hours?|days?|weeks?)\b/i.test(line)) ?? null;
+      }
+    });
+
+    return detail;
+  } finally {
+    await page.close();
+  }
+}
+
+async function clickSeeMoreButtons(page: Page): Promise<void> {
+  const seeMore = page.getByRole('button', { name: /see more/i });
+  const count = await seeMore.count().catch(() => 0);
+  for (let index = 0; index < Math.min(count, 2); index += 1) {
+    await seeMore.nth(index).click().catch(() => undefined);
+    await page.waitForTimeout(200).catch(() => undefined);
+  }
+}
+
+function shortlistForEnrichment(profile: SearchProfile, items: RawListing[], topN: number): RawListing[] {
+  return [...items]
+    .map((item) => ({
+      item,
+      score: scoreListing({ ...item, profileId: profile.id, observedAt: new Date(0).toISOString() }, profile, false).score
+    }))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, topN)
+    .map((entry) => entry.item);
+}
+
+function mergePostedText(existing?: string | null, detail?: string | null): string | null {
+  if (!existing) return detail ?? null;
+  if (!detail) return existing;
+  if (existing.includes(detail)) return existing;
+  return `${existing} | ${detail}`;
 }
 
 export function parseMarketplaceCard(text: string[]): {

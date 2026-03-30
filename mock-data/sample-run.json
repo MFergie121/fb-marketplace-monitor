@@ -1,7 +1,7 @@
 {
   "profiles": [
     {
-      "profileId": "golf-clubs-demo",
+      "profileId": "golf-clubs",
       "items": [
         {
           "externalId": "mock-golf-1",
@@ -13,22 +13,26 @@
           "location": "Richmond, VIC",
           "imageUrl": "https://example.com/driver.jpg",
           "sellerName": "Sam",
-          "description": "Very good condition. Includes headcover.",
+          "description": "Very good condition. Includes headcover. 10.5 degree stiff shaft.",
+          "condition": "Used - like new",
+          "detailCollectedAt": "2026-03-31T09:00:00.000Z",
           "postedText": "Listed 2 hours ago",
           "titleConfidence": "high",
           "parserNotes": []
         },
         {
           "externalId": "mock-golf-2",
-          "title": "Generic golf club bag",
+          "title": "Golf clubs bundle from $50 each",
           "url": "https://www.facebook.com/marketplace/item/mock-golf-2",
-          "price": 120,
-          "priceText": "AU$120",
+          "price": 50,
+          "priceText": "AU$50",
           "currency": "AUD",
           "location": "Brunswick, VIC",
           "imageUrl": "https://example.com/bag.jpg",
           "sellerName": "Alex",
-          "description": "Used bag.",
+          "description": "Bulk lot assorted clubs and bag. Quick sale.",
+          "condition": "Used - fair",
+          "detailCollectedAt": "2026-03-31T09:00:00.000Z",
           "postedText": "Listed yesterday",
           "titleConfidence": "high",
           "parserNotes": []
@@ -51,19 +55,21 @@
       ]
     },
     {
-      "profileId": "watches-demo",
+      "profileId": "ping-driver",
       "items": [
         {
-          "externalId": "mock-watch-1",
-          "title": "Seiko 5 Sports Automatic",
-          "url": "https://www.facebook.com/marketplace/item/mock-watch-1",
-          "price": 220,
-          "priceText": "AU$220",
+          "externalId": "mock-ping-1",
+          "title": "Ping G430 Max Driver 10.5",
+          "url": "https://www.facebook.com/marketplace/item/mock-ping-1",
+          "price": 520,
+          "priceText": "AU$520",
           "currency": "AUD",
           "location": "Carlton, VIC",
-          "imageUrl": "https://example.com/watch.jpg",
+          "imageUrl": "https://example.com/ping-driver.jpg",
           "sellerName": "Jordan",
-          "description": "Automatic Seiko in working condition.",
+          "description": "Ping G430 Max driver with regular shaft and headcover included.",
+          "condition": "Used - good",
+          "detailCollectedAt": "2026-03-31T09:00:00.000Z",
           "postedText": "Listed today",
           "titleConfidence": "high",
           "parserNotes": []

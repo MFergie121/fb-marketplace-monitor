@@ -6,6 +6,8 @@ export type SearchProfile = {
   category?: string;
   brandPreferences: string[];
   keywords?: string[];
+  modelFamilies?: string[];
+  unwantedKeywords?: string[];
   maxPrice?: number;
   minPrice?: number;
   locationLabel?: string;
@@ -29,6 +31,8 @@ export type RawListing = {
   sellerName?: string | null;
   description?: string | null;
   postedText?: string | null;
+  condition?: string | null;
+  detailCollectedAt?: string | null;
   titleConfidence?: TitleConfidence;
   parserNotes?: string[];
 };
@@ -41,6 +45,7 @@ export type ListingObservation = RawListing & {
 export type ScoreReasonCode =
   | 'BRAND_MATCH'
   | 'KEYWORD_MATCH'
+  | 'MODEL_FAMILY_MATCH'
   | 'PRICE_UNDER_MAX'
   | 'PRICE_OVER_MAX'
   | 'MISSING_PRICE'
@@ -50,7 +55,15 @@ export type ScoreReasonCode =
   | 'TITLE_PARSE_FALLBACK'
   | 'TITLE_LOOKS_LIKE_PRICE'
   | 'PLACEHOLDER_PRICE'
-  | 'SUSPICIOUS_PRICE_PATTERN';
+  | 'SUSPICIOUS_PRICE_PATTERN'
+  | 'FROM_PRICE_PATTERN'
+  | 'QUICK_SALE_PHRASE'
+  | 'BULK_MIXED_WORDING'
+  | 'UNWANTED_VARIANT'
+  | 'SPEC_CUE'
+  | 'SPECIFIC_LISTING'
+  | 'SINGLE_ITEM_SIGNAL'
+  | 'VAGUE_LISTING';
 
 export type ScoreReason = {
   code: ScoreReasonCode;
@@ -74,6 +87,7 @@ export type RunResult = {
   profileSummaries: Array<{
     profileId: string;
     collected: number;
+    enriched: number;
     suspiciousEmpty: boolean;
     status: 'success' | 'failed';
     errorMessage: string | null;

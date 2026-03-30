@@ -16,6 +16,8 @@ export type RunOptions = {
   runTimeoutMs: number;
   profileTimeoutMs: number;
   maxListingsPerProfile: number;
+  detailEnrichmentTopN: number;
+  detailWaitMs: number;
   retentionDays: number;
   emptyResultsThreshold: number;
   suspiciousEmptyMinProfiles: number;
@@ -52,6 +54,7 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
       profileSummaries.push({
         profileId: profile.id,
         collected: items.length,
+        enriched: collection.enrichmentCounts?.[profile.id] ?? countEnriched(items),
         suspiciousEmpty,
         status: collection.failures[profile.id] ? 'failed' : 'success',
         errorMessage: collection.failures[profile.id] ?? null
@@ -90,6 +93,7 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
       metadata: {
         profileSummaries,
         failedProfiles: collection.failures,
+        enrichmentCounts: collection.enrichmentCounts,
         digestPathHint: path.resolve('runtime/latest-digest.txt')
       }
     });
@@ -114,13 +118,15 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
   }
 }
 
-async function loadItems(config: AppConfig, options: RunOptions): Promise<{ itemsByProfile: Record<string, RawListing[]>; failures: Record<string, string>; }> {
+async function loadItems(config: AppConfig, options: RunOptions): Promise<{ itemsByProfile: Record<string, RawListing[]>; failures: Record<string, string>; enrichmentCounts: Record<string, number>; }> {
   if (options.mockPath) {
     options.logger.info(`Loading mock data from ${options.mockPath}`);
     const mock = loadMockRun(options.mockPath);
+    const itemsByProfile = Object.fromEntries(mock.profiles.map((profile) => [profile.profileId, profile.items]));
     return {
-      itemsByProfile: Object.fromEntries(mock.profiles.map((profile) => [profile.profileId, profile.items])),
-      failures: {}
+      itemsByProfile,
+      failures: {},
+      enrichmentCounts: Object.fromEntries(Object.entries(itemsByProfile).map(([profileId, items]) => [profileId, countEnriched(items)]))
     };
   }
 
@@ -130,9 +136,15 @@ async function loadItems(config: AppConfig, options: RunOptions): Promise<{ item
     navTimeoutMs: options.navTimeoutMs,
     profileTimeoutMs: options.profileTimeoutMs,
     maxListingsPerProfile: options.maxListingsPerProfile,
+    detailEnrichmentTopN: options.detailEnrichmentTopN,
+    detailWaitMs: options.detailWaitMs,
     debug: options.debug,
     logger: options.logger
   });
+}
+
+function countEnriched(items: RawListing[]): number {
+  return items.filter((item) => Boolean(item.description || item.condition || item.detailCollectedAt)).length;
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

@@ -11,12 +11,14 @@ export function generateDigest(input: {
 }): string {
   const top = [...input.scored].sort((a, b) => b.score - a.score).slice(0, 12);
   const failedProfileIds = Object.keys(input.failedProfiles ?? {});
+  const enrichedCount = input.scored.filter((item) => Boolean(item.description || item.condition || item.detailCollectedAt)).length;
   const header = [
     `Facebook Marketplace monitor`,
     `Status: ${input.status}`,
     `Window: ${input.startedAt} → ${input.finishedAt}`,
     `Profiles scanned: ${input.profiles.length}`,
-    `Listings seen: ${input.scored.length}`
+    `Listings seen: ${input.scored.length}`,
+    `Listings enriched: ${enrichedCount}`
   ];
 
   if (input.suspiciousProfiles.length > 0) {
@@ -34,15 +36,22 @@ export function generateDigest(input: {
   const body = top.length === 0
     ? ['No listings scored this run.']
     : top.map((item, index) => {
-        const reasons = item.reasons.map((reason) => reason.code).join(', ');
+        const reasons = item.reasons.map((reason) => `${reason.code}(${reason.weight >= 0 ? '+' : ''}${reason.weight})`).join(', ');
         const confidenceLabel = formatConfidence(item.titleConfidence);
         const flags = [
           item.titleConfidence === 'low' ? 'weak-title' : null,
           item.reasons.some((reason) => reason.code === 'PLACEHOLDER_PRICE') ? 'placeholder-price' : null,
-          item.reasons.some((reason) => reason.code === 'TITLE_LOOKS_LIKE_PRICE') ? 'title-from-price-risk' : null
+          item.reasons.some((reason) => reason.code === 'TITLE_LOOKS_LIKE_PRICE') ? 'title-from-price-risk' : null,
+          item.description ? 'detail-enriched' : null
         ].filter(Boolean).join(', ');
+        const summaryBits = [
+          item.location ?? 'Unknown location',
+          item.condition ? `Condition: ${item.condition}` : null,
+          `Title confidence: ${confidenceLabel}`
+        ].filter(Boolean).join(' | ');
+        const description = summarizeDescription(item.description);
 
-        return `${index + 1}. [${item.profileId}] ${item.title} — ${formatPrice(item.price, item.currency, item.priceText)} — score ${item.score}${flags ? ` — flags: ${flags}` : ''}\n   ${item.location ?? 'Unknown location'}\n   Title confidence: ${confidenceLabel}\n   Reasons: ${reasons || 'none'}\n   ${item.url}`;
+        return `${index + 1}. [${item.profileId}] ${item.title} — ${formatPrice(item.price, item.currency, item.priceText)} — score ${item.score}${flags ? ` — flags: ${flags}` : ''}\n   ${summaryBits}\n   Reasons: ${reasons || 'none'}\n${description ? `   Description: ${description}\n` : ''}   ${item.url}`;
       });
 
   return [...header, ...failureBody, '', ...body].join('\n');
@@ -65,4 +74,10 @@ function formatConfidence(confidence?: 'high' | 'medium' | 'low'): string {
     default:
       return 'unknown';
   }
+}
+
+function summarizeDescription(description?: string | null): string | null {
+  if (!description) return null;
+  const compact = description.replace(/\s+/g, ' ').trim();
+  return compact.length <= 180 ? compact : `${compact.slice(0, 177)}...`;
 }

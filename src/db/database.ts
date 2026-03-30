@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import type { RawListing, ScoredObservation, SearchProfile, RunStatus } from '../types.js';
+import type { RawListing, ScoredObservation, RunStatus } from '../types.js';
 
 export type AppDb = Database.Database;
 
@@ -39,6 +39,8 @@ export function migrate(db: AppDb): void {
       seller_name TEXT,
       latest_description TEXT,
       latest_location TEXT,
+      latest_condition TEXT,
+      detail_collected_at TEXT,
       last_profile_id TEXT
     );
 
@@ -55,7 +57,9 @@ export function migrate(db: AppDb): void {
       image_url TEXT,
       seller_name TEXT,
       description TEXT,
+      condition TEXT,
       posted_text TEXT,
+      detail_collected_at TEXT,
       score INTEGER NOT NULL,
       reason_codes_json TEXT NOT NULL,
       raw_json TEXT NOT NULL
@@ -81,6 +85,11 @@ export function migrate(db: AppDb): void {
     CREATE INDEX IF NOT EXISTS idx_observations_listing_id ON observations(listing_id);
     CREATE INDEX IF NOT EXISTS idx_listings_latest_seen_at ON listings(latest_seen_at);
   `);
+
+  ensureColumn(db, 'listings', 'latest_condition', 'TEXT');
+  ensureColumn(db, 'listings', 'detail_collected_at', 'TEXT');
+  ensureColumn(db, 'observations', 'condition', 'TEXT');
+  ensureColumn(db, 'observations', 'detail_collected_at', 'TEXT');
 }
 
 export function createRun(db: AppDb, startedAt: string): number {
@@ -99,7 +108,7 @@ export function upsertListing(db: AppDb, listing: RawListing & { observedAt: str
   if (existing) {
     db.prepare(`
       UPDATE listings
-      SET canonical_url = ?, title = ?, latest_seen_at = ?, latest_price = ?, currency = ?, image_url = ?, seller_name = ?, latest_description = ?, latest_location = ?, last_profile_id = ?
+      SET canonical_url = ?, title = ?, latest_seen_at = ?, latest_price = ?, currency = ?, image_url = ?, seller_name = ?, latest_description = ?, latest_location = ?, latest_condition = ?, detail_collected_at = ?, last_profile_id = ?
       WHERE id = ?
     `).run(
       listing.url,
@@ -111,6 +120,8 @@ export function upsertListing(db: AppDb, listing: RawListing & { observedAt: str
       listing.sellerName ?? null,
       listing.description ?? null,
       listing.location ?? null,
+      listing.condition ?? null,
+      listing.detailCollectedAt ?? null,
       listing.profileId,
       existing.id
     );
@@ -119,8 +130,8 @@ export function upsertListing(db: AppDb, listing: RawListing & { observedAt: str
 
   const insert = db.prepare(`
     INSERT INTO listings (
-      external_id, canonical_url, title, first_seen_at, latest_seen_at, latest_price, currency, image_url, seller_name, latest_description, latest_location, last_profile_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      external_id, canonical_url, title, first_seen_at, latest_seen_at, latest_price, currency, image_url, seller_name, latest_description, latest_location, latest_condition, detail_collected_at, last_profile_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = insert.run(
     listing.externalId,
@@ -134,6 +145,8 @@ export function upsertListing(db: AppDb, listing: RawListing & { observedAt: str
     listing.sellerName ?? null,
     listing.description ?? null,
     listing.location ?? null,
+    listing.condition ?? null,
+    listing.detailCollectedAt ?? null,
     listing.profileId
   );
   return { listingId: Number(result.lastInsertRowid), isNew: true };
@@ -142,8 +155,8 @@ export function upsertListing(db: AppDb, listing: RawListing & { observedAt: str
 export function insertObservation(db: AppDb, runId: number, listingId: number, observation: ScoredObservation): void {
   db.prepare(`
     INSERT INTO observations (
-      run_id, listing_id, profile_id, observed_at, title, price, currency, location, image_url, seller_name, description, posted_text, score, reason_codes_json, raw_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      run_id, listing_id, profile_id, observed_at, title, price, currency, location, image_url, seller_name, description, condition, posted_text, detail_collected_at, score, reason_codes_json, raw_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     runId,
     listingId,
@@ -156,7 +169,9 @@ export function insertObservation(db: AppDb, runId: number, listingId: number, o
     observation.imageUrl ?? null,
     observation.sellerName ?? null,
     observation.description ?? null,
+    observation.condition ?? null,
     observation.postedText ?? null,
+    observation.detailCollectedAt ?? null,
     observation.score,
     JSON.stringify(observation.reasons),
     JSON.stringify(observation)
@@ -189,4 +204,11 @@ export function cleanupOldData(db: AppDb, retentionDays: number): void {
 
 export function listProfilesSeen(db: AppDb): Array<{ profileId: string; lastSeenAt: string }> {
   return db.prepare('SELECT last_profile_id as profileId, latest_seen_at as lastSeenAt FROM listings WHERE last_profile_id IS NOT NULL ORDER BY latest_seen_at DESC').all() as Array<{ profileId: string; lastSeenAt: string }>;
+}
+
+function ensureColumn(db: AppDb, table: string, column: string, definition: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!columns.some((entry) => entry.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }

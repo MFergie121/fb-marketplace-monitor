@@ -7,8 +7,10 @@
       "enabled": true,
       "category": "sporting-goods",
       "brandPreferences": ["TaylorMade", "Titleist", "Ping", "Callaway"],
-      "maxPrice": 1200,
+      "modelFamilies": ["Stealth", "Paradym", "G430"],
       "keywords": ["driver", "irons", "set"],
+      "unwantedKeywords": ["kids", "junior", "women's", "ladies"],
+      "maxPrice": 1200,
       "locationLabel": "Melbourne"
     },
     {
@@ -18,8 +20,10 @@
       "enabled": true,
       "category": "fashion",
       "brandPreferences": ["Seiko", "Tissot", "Citizen", "Casio"],
-      "maxPrice": 600,
+      "modelFamilies": ["Seiko 5", "Prospex"],
       "keywords": ["automatic", "diver", "vintage"],
+      "unwantedKeywords": ["women's", "ladies", "kids"],
+      "maxPrice": 600,
       "locationLabel": "Melbourne"
     }
   ]

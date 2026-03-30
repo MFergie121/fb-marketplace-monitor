@@ -5,6 +5,7 @@ import { loadConfig } from './config/loadConfig.js';
 import { migrate, openDatabase } from './db/database.js';
 import { createLogger } from './logging.js';
 import { runMonitor } from './run/runMonitor.js';
+import { loadMockRun } from './mocks/loadMockRun.js';
 
 dotenv.config();
 
@@ -23,6 +24,8 @@ const env = {
   runTimeoutMs: Number(process.env.FBM_RUN_TIMEOUT_MS ?? 300000),
   profileTimeoutMs: Number(process.env.FBM_PROFILE_TIMEOUT_MS ?? 90000),
   maxListingsPerProfile: Number(process.env.FBM_MAX_LISTINGS_PER_PROFILE ?? 40),
+  detailEnrichmentTopN: Number(process.env.FBM_DETAIL_ENRICHMENT_TOP_N ?? 5),
+  detailWaitMs: Number(process.env.FBM_DETAIL_WAIT_MS ?? 2500),
   retentionDays: Number(process.env.FBM_RETENTION_DAYS ?? 30),
   emptyResultsThreshold: Number(process.env.FBM_EMPTY_RESULTS_THRESHOLD ?? 2),
   suspiciousEmptyMinProfiles: Number(process.env.FBM_SUSPICIOUS_EMPTY_MIN_PROFILES ?? 1),
@@ -51,8 +54,15 @@ async function main(): Promise<void> {
         throw new Error(`No profile matched --profile ${profileFilter}`);
       }
 
-      const effectiveConfig = { profiles: filteredProfiles };
       const mockPath = getFlagValue('--mock');
+      const mockProfileIds = mockPath
+        ? new Set(loadMockRun(path.resolve(mockPath)).profiles.map((profile) => profile.profileId))
+        : null;
+      const effectiveConfig = {
+        profiles: mockProfileIds && !profileFilter
+          ? filteredProfiles.filter((profile) => mockProfileIds.has(profile.id))
+          : filteredProfiles
+      };
       logger.info(`Config loaded: ${effectiveConfig.profiles.filter((profile) => profile.enabled).length} enabled profile(s)`);
       if (profileFilter) {
         logger.info(`Diagnostic mode: restricted to profile ${profileFilter}`);

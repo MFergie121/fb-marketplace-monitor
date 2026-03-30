@@ -8,14 +8,15 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
   - `/Users/maxfergie/.openclaw/browser-profiles/fb-marketplace-monitor`
 - Reads config-driven Marketplace search profiles from JSON
 - Collects visible listing cards from Marketplace search pages
-- Applies lightweight parsing heuristics to separate title, price, and location from card text
+- Shortlists a small configurable top-N per profile and opens detail pages to capture richer fields, especially description text
 - Stores runs, listings, observations, and digest previews in SQLite
 - Scores listings deterministically with explicit reason codes
-- Penalises obvious placeholder/bait prices like `$1`, `Free`, or synthetic numeric placeholders such as `1234`
-- Generates Discord-friendly digest text for later delivery integrations, including title-confidence and parser risk flags
+- Penalises noisy patterns such as placeholder prices, `from $X`, `each`, quick-sale language, bulk/mixed bundles, and profile-configured unwanted variants
+- Boosts exact brands, configured model families, cleaner single-item listings, and relevant spec cues found in title or description
+- Generates Discord-friendly digest text with score explanations and description snippets for enriched items
 - Detects suspicious empty runs and enforces a simple run lock
 - Supports a mock-data path so the full digest pipeline can be tested without live scraping
-- Emits step-level run logs so browser launch / profile progress / digest generation are visible during live runs
+- Emits step-level run logs so browser launch / profile progress / enrichment / digest generation are visible during live runs
 
 ## Security / operational notes
 
@@ -23,6 +24,7 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
 - Login should happen manually inside the dedicated Chrome profile.
 - Data retention defaults to 30 days for observations, runs, and generated notification previews.
 - No live Discord/WhatsApp sending is included in this MVP.
+- Detail enrichment is intentionally conservative: only a small shortlist per profile is opened.
 
 ## Setup
 
@@ -56,8 +58,10 @@ Search profiles live in `config/search-profiles.json`:
       "enabled": true,
       "category": "sporting-goods",
       "brandPreferences": ["TaylorMade", "Titleist"],
-      "maxPrice": 1200,
+      "modelFamilies": ["Stealth", "Paradym", "G430"],
       "keywords": ["driver", "irons"],
+      "unwantedKeywords": ["kids", "junior", "women's", "ladies"],
+      "maxPrice": 1200,
       "locationLabel": "Melbourne"
     }
   ]
@@ -69,6 +73,8 @@ Useful runtime knobs:
 - `FBM_DEBUG=true` enables verbose progress logs.
 - `FBM_PROFILE_TIMEOUT_MS=90000` caps how long one profile can hang before the run continues as `partial`.
 - `FBM_RUN_TIMEOUT_MS=300000` caps total run time.
+- `FBM_DETAIL_ENRICHMENT_TOP_N=5` controls how many shortlisted listings per profile get detail-page enrichment.
+- `FBM_DETAIL_WAIT_MS=2500` controls how long the detail page gets to settle before extraction.
 
 ## Manual run commands
 
@@ -111,10 +117,11 @@ Typical progress logging includes:
 - DB opened / run lock acquired
 - browser launch starting / browser launched
 - each profile starting / completed / failed / item count
+- detail shortlist count and enrichment count per profile
 - digest generation
 - run finished / lock released
 
-If a profile stalls, the monitor should now fail that profile after `FBM_PROFILE_TIMEOUT_MS`, log the reason, and finish the overall run with `status=partial` instead of appearing silently frozen forever.
+If a profile stalls, the monitor should fail that profile after `FBM_PROFILE_TIMEOUT_MS`, log the reason, and finish the overall run with `status=partial` instead of appearing silently frozen forever.
 
 ## Outputs
 
@@ -125,8 +132,9 @@ If a profile stalls, the monitor should now fail that profile after `FBM_PROFILE
 Digest rows now include:
 
 - parsed title-confidence (`high`, `medium`, `low`)
-- risk flags for weak titles / placeholder pricing
-- raw scoring reason codes so weak parses are visible instead of quietly ranking as strong finds
+- risk flags for weak titles / placeholder pricing / detail enrichment
+- raw scoring reason codes with weights
+- short description snippets when available
 - failed-profile summaries when a live scrape partially succeeds
 
 ## Suspicious-empty logic
@@ -140,8 +148,8 @@ If the number of suspicious profiles hits `FBM_SUSPICIOUS_EMPTY_MIN_PROFILES`, t
 
 ## Notes / limitations
 
-- Collector intentionally targets visible listing cards only for MVP safety and simplicity.
+- Collector still starts from visible listing cards; enrichment only follows a short scored shortlist.
 - Marketplace DOM changes may still require selector tuning.
-- Seller/description fields are mostly unavailable from search cards and are stored when present in mock data or visible card text.
-- Parsing heuristics are deliberately lightweight; low-confidence rows are flagged rather than silently treated as trustworthy.
+- Detail extraction uses lightweight page-text heuristics and stores only low-risk visible fields such as description, condition, seller name, and location.
+- Parsing/scoring heuristics are deliberately deterministic and explainable rather than clever-magic.
 - Per-profile timeouts reduce silent hangs, but a browser engine failure before launch can still fail the whole run early.
