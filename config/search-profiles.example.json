@@ -1,0 +1,26 @@
+{
+  "profiles": [
+    {
+      "id": "golf-clubs-demo",
+      "label": "Golf clubs",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=golf%20clubs",
+      "enabled": true,
+      "category": "sporting-goods",
+      "brandPreferences": ["TaylorMade", "Titleist", "Ping", "Callaway"],
+      "maxPrice": 1200,
+      "keywords": ["driver", "irons", "set"],
+      "locationLabel": "Melbourne"
+    },
+    {
+      "id": "watches-demo",
+      "label": "Watches",
+      "url": "https://www.facebook.com/marketplace/melbourne/search?query=watch",
+      "enabled": true,
+      "category": "fashion",
+      "brandPreferences": ["Seiko", "Tissot", "Citizen", "Casio"],
+      "maxPrice": 600,
+      "keywords": ["automatic", "diver", "vintage"],
+      "locationLabel": "Melbourne"
+    }
+  ]
+}

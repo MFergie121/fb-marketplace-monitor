@@ -1,0 +1,50 @@
+{
+  "profiles": [
+    {
+      "profileId": "golf-clubs-demo",
+      "items": [
+        {
+          "externalId": "mock-golf-1",
+          "title": "TaylorMade Stealth Driver 10.5",
+          "url": "https://www.facebook.com/marketplace/item/mock-golf-1",
+          "price": 350,
+          "currency": "AUD",
+          "location": "Richmond, VIC",
+          "imageUrl": "https://example.com/driver.jpg",
+          "sellerName": "Sam",
+          "description": "Very good condition. Includes headcover.",
+          "postedText": "Listed 2 hours ago"
+        },
+        {
+          "externalId": "mock-golf-2",
+          "title": "Generic golf club bag",
+          "url": "https://www.facebook.com/marketplace/item/mock-golf-2",
+          "price": 120,
+          "currency": "AUD",
+          "location": "Brunswick, VIC",
+          "imageUrl": "https://example.com/bag.jpg",
+          "sellerName": "Alex",
+          "description": "Used bag.",
+          "postedText": "Listed yesterday"
+        }
+      ]
+    },
+    {
+      "profileId": "watches-demo",
+      "items": [
+        {
+          "externalId": "mock-watch-1",
+          "title": "Seiko 5 Sports Automatic",
+          "url": "https://www.facebook.com/marketplace/item/mock-watch-1",
+          "price": 220,
+          "currency": "AUD",
+          "location": "Carlton, VIC",
+          "imageUrl": "https://example.com/watch.jpg",
+          "sellerName": "Jordan",
+          "description": "Automatic Seiko in working condition.",
+          "postedText": "Listed today"
+        }
+      ]
+    }
+  ]
+}
