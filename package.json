@@ -9,7 +9,10 @@
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts",
     "run": "tsx src/cli.ts run",
+    "run:research": "tsx src/cli.ts run --research",
+    "run:legacy": "tsx src/cli.ts run --no-research --config ./config/search-profiles.json",
     "run:mock": "tsx src/cli.ts run --mock ./mock-data/sample-run.json",
+    "research:build": "tsx src/cli.ts build-research-config",
     "db:init": "tsx src/cli.ts init-db"
   },
   "dependencies": {

@@ -3,7 +3,7 @@ import type { Logger } from '../logging.js';
 import type { AppConfig, ListingObservation, RawListing, RunResult, RunStatus, ScoredObservation } from '../types.js';
 import { collectMarketplaceListings } from '../collector/marketplaceCollector.js';
 import { openDatabase, migrate, createRun, finishRun, upsertListing, insertObservation, insertNotification, getRecentObservedCounts, cleanupOldData } from '../db/database.js';
-import { generateDigest } from '../digest/generateDigest.js';
+import { generateDebugDigest, generateDigest } from '../digest/generateDigest.js';
 import { loadMockRun } from '../mocks/loadMockRun.js';
 import { acquireRunLock, releaseRunLock } from './lock.js';
 import { scoreListing } from '../scoring/scoreListings.js';
@@ -89,7 +89,9 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
     };
     const digests = {
       discord: generateDigest(digestInput, 'discord'),
-      email: generateDigest(digestInput, 'email')
+      email: generateDigest(digestInput, 'email'),
+      debugDiscord: generateDebugDigest(digestInput, 'discord'),
+      debugEmail: generateDebugDigest(digestInput, 'email')
     };
     insertNotification(db, runId, digests.discord);
     finishRun(db, runId, {

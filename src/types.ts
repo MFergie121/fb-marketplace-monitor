@@ -168,6 +168,8 @@ export type RunResult = {
   digests: {
     discord: string;
     email: string;
+    debugDiscord: string;
+    debugEmail: string;
   };
 };
 

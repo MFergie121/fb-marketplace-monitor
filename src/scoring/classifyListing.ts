@@ -1,10 +1,12 @@
 import type { ListingClassification, ListingObservation } from '../types.js';
 
 const ACCESSORY_TERMS = [
-  'shaft', 'headcover', 'grip', 'bag', 'cover', 'strap', 'case', 'lens', 'replacement', 'spare', 'accessory', 'parts', 'part', 'repair', 'service', 'fitting', 'lessons', 'lesson', 'booking', 'hire', 'rental', 'custom', 'reshaft', 'paint fill', 'paintfill', 'trade in', 'trade-in'
+  'shaft', 'shafts', 'headcover', 'head cover', 'grip', 'grips', 'bag', 'cover', 'strap', 'case', 'lens', 'replacement', 'spare',
+  'accessory', 'accessories', 'parts', 'part', 'repair', 'service', 'fitting', 'lessons', 'lesson', 'booking', 'hire', 'rental',
+  'custom', 'reshaft', 'paint fill', 'paintfill', 'trade in', 'trade-in', 'adapter', 'adaptor', 'sleeve', 'tool', 'torque wrench', 'wrench'
 ];
 
-const MODIFICATION_TERMS = ['head only', 'shaft only', 'no head', 'no shaft', 'shell only', 'frame only', 'for parts', 'broken'];
+const HARD_MODIFICATION_TERMS = ['head only', 'shaft only', 'no head', 'no shaft', 'headcover only', 'cover only', 'bag only', 'grip only', 'for parts', 'broken'];
 const BUNDLE_TERMS = ['bundle', 'lot', 'bulk', 'assorted', 'mixed', 'collection', 'job lot', 'package deal'];
 const MULTI_ITEM_TERMS = ['driver', 'fairway wood', 'wood', 'hybrid', 'irons', 'iron set', 'putter', 'wedge', 'bag', 'helmet', 'goggles', 'bindings', 'boots', 'rods', 'reels'];
 const PRIMARY_ITEM_TERMS = ['driver', 'fairway wood', 'wood', 'hybrid', 'irons', 'iron set', 'putter', 'wedge', 'watch', 'helmet', 'goggles', 'skis', 'rod', 'reel'];
@@ -16,14 +18,28 @@ export function classifyListing(observation: ListingObservation): ListingClassif
   const identifiedComponents = detectComponents(haystack);
 
   const accessoryHits = ACCESSORY_TERMS.filter((term) => haystack.includes(term));
-  const modificationHits = MODIFICATION_TERMS.filter((term) => haystack.includes(term));
+  const modificationHits = HARD_MODIFICATION_TERMS.filter((term) => haystack.includes(term));
   const bundleHits = BUNDLE_TERMS.filter((term) => haystack.includes(term));
   const hasSetWording = SET_TERMS.some((term) => haystack.includes(term));
   const hasPerItemPricing = /\bfrom\s+(?:au\$|\$)?\s*\d|\beach\b|\bper\s+(?:item|piece|pc)\b|(?<![a-z])\bea\b(?![a-z])/i.test(haystack);
   const hasQuantitySignal = /\b\d+\s*x\b|\bx\s*\d+\b|\b\d+\s+(?:clubs|items|pairs|pieces|pcs|rods)\b/i.test(haystack);
   const looksLikeService = /\b(service|repair|lesson|lessons|booking|fitting|rental|hire)\b/i.test(haystack);
   const hasPrimaryItemSignal = PRIMARY_ITEM_TERMS.some((term) => haystack.includes(term));
-  const looksLikeAccessoryOnly = accessoryHits.length > 0 || modificationHits.length > 0 || looksLikeService;
+  const hardAccessoryOnly = modificationHits.length > 0;
+  const looksLikeAccessoryOnly = accessoryHits.length > 0 || hardAccessoryOnly || looksLikeService;
+
+  if (hardAccessoryOnly) {
+    accessoryHits.forEach((hit) => matchedSignals.add(`accessory:${hit}`));
+    modificationHits.forEach((hit) => matchedSignals.add(`modification:${hit}`));
+    return {
+      listingType: 'accessory_service_modification',
+      confidence: 'high',
+      summary: 'Head-only / shaft-only / parts wording makes this unsafe as a buyer-facing club listing',
+      matchedSignals: [...matchedSignals],
+      identifiedComponents,
+      canDecomposeBundle: false
+    };
+  }
 
   if (looksLikeAccessoryOnly && !hasPrimaryItemSignal && identifiedComponents.length <= 1 && !hasSetWording && bundleHits.length === 0) {
     accessoryHits.forEach((hit) => matchedSignals.add(`accessory:${hit}`));

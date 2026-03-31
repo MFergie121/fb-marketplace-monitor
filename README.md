@@ -2,11 +2,14 @@
 
 Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
 
+The golf workflow is now **research-first by default**: a local premium-golf research catalog generates the premium club profiles, then the normal Marketplace monitor runs against those deterministic research-led profiles.
+
 ## What it does
 
 - Uses Playwright with a dedicated Chrome profile at:
   - `/Users/maxfergie/.openclaw/browser-profiles/fb-marketplace-monitor`
 - Reads config-driven Marketplace search profiles from JSON
+- Can build those profiles from a local research catalog of premium golf club families and price bands
 - Supports controlled per-profile search augmentation via named query expansions
 - Supports high-signal profile targeting with optional `requiredAnyKeywords` gates so broad searches can still prefer premium models rather than generic category junk
 - Collects visible listing cards from Marketplace search pages
@@ -18,7 +21,8 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
 - Prevents single-item comps from being applied to bundles; fuzzy bundles get downgraded/withheld instead of fake precision
 - Penalises noisy patterns such as placeholder prices, `from $X`, `each`, quick-sale language, bulk/mixed bundles, and profile-configured unwanted variants
 - Boosts exact brands, configured model families, cleaner single-item listings, and relevant spec cues found in title or description
-- Generates mobile-friendly plain-text digests for both Discord and email, with compact labeled blocks, sectioned ranking, and cleaner link placement for phone reading
+- Generates a buyer-facing plain-text brief for both Discord and email: top picks, worth a look, filtered-out summary, and a tiny footer
+- Writes separate debug digests so richer scoring / valuation detail is preserved without leaking into the buyer-facing brief
 - Detects suspicious empty runs and enforces a simple run lock
 - Supports a mock-data path so the full digest pipeline can be tested without live scraping
 - Emits step-level run logs so browser launch / profile progress / enrichment / digest generation are visible during live runs
@@ -51,7 +55,17 @@ Optional first-time browser setup:
 
 Environment variables are documented in `.env.example`.
 
-Search profiles live in `config/search-profiles.json`:
+Search profiles usually live in `config/search-profiles.json`.
+
+For golf, the research-first path is now the default premium workflow:
+- edit `config/golf-research-catalog.json`
+- optionally generate profiles with `npm run research:build`
+- run with `npm run run` for the normal research-led premium golf flow
+- use `npm run run:legacy` only if you explicitly want the old static `config/search-profiles.json` path
+
+The research catalog is the source of truth for premium newly released / up-and-coming golf club families. It compiles into ordinary monitor profiles so the existing collector/scoring/digest pipeline stays intact, while staying local and deterministic.
+
+Standard static search profiles live in `config/search-profiles.json`:
 
 ```json
 {
@@ -111,7 +125,7 @@ How valuation works:
 - category heuristics: fallback used-value bands for `golf`, `skis`, `ski-goggles`, and `ski-helmet`
 - local observed baseline: lightweight median-based band from similar historical observations already in SQLite, but only from prior observations with the same listing type
 - bundle/set valuation only proceeds when the bundle is identifiable enough and a bundle-safe reference / heuristic / baseline exists
-- final digest output explains which sources were used and whether the price looks `attractive`, `fair`, `uncertain`, `overpriced`, or `withheld`
+- buyer-facing digest only surfaces concise buyer-safe picks; richer valuation/scoring detail is kept in separate debug digest artifacts
 
 Useful runtime knobs:
 
@@ -123,10 +137,28 @@ Useful runtime knobs:
 
 ## Manual run commands
 
-Live scrape:
+Live scrape (research-first premium golf default):
 
 ```bash
 npm run run
+```
+
+Explicit research-first golf run:
+
+```bash
+npm run run:research
+```
+
+Legacy static-profile run:
+
+```bash
+npm run run:legacy
+```
+
+Build the research-generated profile JSON without running a scrape:
+
+```bash
+npm run research:build
 ```
 
 Verbose live scrape:
@@ -138,7 +170,7 @@ npm run run -- --debug
 Single-profile diagnostic run:
 
 ```bash
-npm run run -- --profile golf-clubs-demo --debug
+npm run run -- --profile research-premium-drivers --debug
 ```
 
 Mock pipeline test:
@@ -180,16 +212,17 @@ If a profile stalls, the monitor should fail that profile after `FBM_PROFILE_TIM
 - Latest digest preview in the selected CLI format: `runtime/latest-digest.txt`
 - Discord digest preview: `runtime/latest-digest.discord.txt`
 - Email digest preview: `runtime/latest-digest.email.txt`
+- Debug Discord digest preview: `runtime/latest-digest.debug.discord.txt`
+- Debug email digest preview: `runtime/latest-digest.debug.email.txt`
 - Generated digest copies are also stored in `notifications` for later integration work (Discord preview payload).
 
-Digest output now includes:
+Buyer-facing digest output now includes:
 
-- separate Discord and email plain-text renderers
-- compact sectioned ranking (`TOP PICKS`, `WORTH CHECKING`, `BUNDLES / SETS`, `WITHHELD / UNCERTAIN`)
-- short labeled item blocks optimised for phone scanning
-- listing type, confidence, valuation, price, location, watch-outs, and link on every row
-- trailing `Link:` lines so raw URLs do less visual damage in email
-- compact summary/header lines plus failed-profile / suspicious-empty notes when relevant
+- `TOP PICKS` capped at 3
+- `WORTH A LOOK` capped at 3
+- a compact filtered-out summary
+- a tiny footer with run caveats only when needed
+- strong exclusion of accessory / modification / weak-signal premium golf noise from the main buyer brief
 
 ## Suspicious-empty logic
 

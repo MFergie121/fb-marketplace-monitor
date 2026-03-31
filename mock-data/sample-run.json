@@ -1,7 +1,7 @@
 {
   "profiles": [
     {
-      "profileId": "golf-premium-drivers",
+      "profileId": "research-premium-drivers",
       "items": [
         {
           "externalId": "mock-golf-1",
@@ -72,7 +72,7 @@
       ]
     },
     {
-      "profileId": "golf-premium-irons",
+      "profileId": "research-premium-irons",
       "items": [
         {
           "externalId": "mock-irons-1",
@@ -94,7 +94,7 @@
       ]
     },
     {
-      "profileId": "golf-premium-putters",
+      "profileId": "research-premium-putters",
       "items": [
         {
           "externalId": "mock-putter-1",

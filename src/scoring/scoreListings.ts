@@ -158,7 +158,7 @@ function classificationReasons(valuation: ValuationContext): ScoreReason[] {
     case 'bundle_or_set':
       return [{ code: 'LISTING_TYPE_BUNDLE', weight: valuation.classification.canDecomposeBundle ? -8 : -18, detail: summary }];
     case 'accessory_service_modification':
-      return [{ code: 'LISTING_TYPE_ACCESSORY_SERVICE', weight: -20, detail: summary }];
+      return [{ code: 'LISTING_TYPE_ACCESSORY_SERVICE', weight: -40, detail: summary }];
     case 'ambiguous':
     default:
       return [{ code: 'LISTING_TYPE_AMBIGUOUS', weight: -12, detail: summary }];

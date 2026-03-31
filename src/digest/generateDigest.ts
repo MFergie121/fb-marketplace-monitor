@@ -12,15 +12,40 @@ export type DigestInput = {
   failedProfiles?: Record<string, string>;
 };
 
+type BuyerSections = {
+  topPicks: ScoredObservation[];
+  worthALook: ScoredObservation[];
+  filteredSummary: string[];
+};
+
 export function generateDigest(input: DigestInput, format: DigestFormat = 'discord'): string {
-  const sections = buildSections(input.scored);
+  const sections = buildBuyerSections(input.scored);
+  const runTimeLabel = formatRunWindow(input.startedAt, input.finishedAt);
+  const header = [
+    'FB MARKETPLACE BUYER BRIEF',
+    runTimeLabel,
+    `Profiles: ${summarizeProfiles(input.profiles)}`
+  ];
+
+  const blocks = [
+    renderBuyerSection('🔥 TOP PICKS', sections.topPicks, format),
+    renderBuyerSection('👀 WORTH A LOOK', sections.worthALook, format),
+    renderFilteredSummary(sections.filteredSummary),
+    renderBuyerFooter(input, sections)
+  ].filter(Boolean) as string[];
+
+  return [...header, '', ...blocks].join('\n\n').trim();
+}
+
+export function generateDebugDigest(input: DigestInput, format: DigestFormat = 'discord'): string {
+  const sections = buildLegacySections(input.scored);
   const failedProfileIds = Object.keys(input.failedProfiles ?? {});
   const runTimeLabel = formatRunWindow(input.startedAt, input.finishedAt);
   const header = [
-    'FB MARKETPLACE SHORTLIST',
+    'FB MARKETPLACE DEBUG DIGEST',
     `${runTimeLabel}`,
     `Profiles: ${summarizeProfiles(input.profiles)}`,
-    `Seen ${input.scored.length} • Shortlisted ${sections.shortlist.length}${sections.watchlist.length > 0 ? ` • Watchlist ${sections.watchlist.length}` : ''}`
+    `Seen ${input.scored.length} • Buyer top picks ${buildBuyerSections(input.scored).topPicks.length}${sections.watchlist.length > 0 ? ` • Debug watchlist ${sections.watchlist.length}` : ''}`
   ];
 
   if (input.status !== 'success') header.push(`Status: ${input.status}`);
@@ -28,48 +53,99 @@ export function generateDigest(input: DigestInput, format: DigestFormat = 'disco
   if (failedProfileIds.length > 0) header.push(`Failed profiles: ${failedProfileIds.join(', ')}`);
 
   const blocks = [
-    renderSection('🎯 SHORTLIST', sections.shortlist, format),
-    renderSection('👀 WATCHLIST', sections.watchlist, format),
+    renderDebugSection('🎯 DEBUG SHORTLIST', sections.shortlist, format),
+    renderDebugSection('👀 DEBUG WATCHLIST', sections.watchlist, format),
     renderRunNotes(input)
   ].filter(Boolean) as string[];
 
   return [...header, '', ...blocks].join('\n\n').trim();
 }
 
-function buildSections(scored: ScoredObservation[]) {
+function buildBuyerSections(scored: ScoredObservation[]): BuyerSections {
+  const ranked = [...scored].sort(compareItems);
+  const buyerSafe = ranked.filter(isBuyerFacingSafe);
+  const topPicks: ScoredObservation[] = [];
+  const worthALook: ScoredObservation[] = [];
+
+  for (const item of buyerSafe) {
+    if (isTopPick(item) && topPicks.length < 3) {
+      topPicks.push(item);
+      continue;
+    }
+
+    if (isWorthALook(item) && worthALook.length < 3) {
+      worthALook.push(item);
+    }
+  }
+
+  const filteredSummary = buildFilteredSummary(scored, { topPicks, worthALook });
+  return { topPicks, worthALook, filteredSummary };
+}
+
+function buildLegacySections(scored: ScoredObservation[]) {
   const ranked = [...scored].sort(compareItems);
   const shortlist: ScoredObservation[] = [];
   const watchlist: ScoredObservation[] = [];
 
   for (const item of ranked) {
-    if (isShortlistItem(item) && shortlist.length < 6) {
+    if (isTopPick(item) && shortlist.length < 6) {
       shortlist.push(item);
       continue;
     }
 
-    if (isWatchlistItem(item) && watchlist.length < 4) {
+    if (isWorthALook(item) && watchlist.length < 4) {
       watchlist.push(item);
     }
   }
 
   if (shortlist.length === 0) {
-    shortlist.push(...ranked.filter(isWatchlistItem).slice(0, 3));
+    shortlist.push(...ranked.filter(isWorthALook).slice(0, 3));
   }
 
   return { shortlist, watchlist };
 }
 
-function renderSection(title: string, items: ScoredObservation[], format: DigestFormat): string | null {
+function renderBuyerSection(title: string, items: ScoredObservation[], format: DigestFormat): string | null {
   if (items.length === 0) return null;
-  return `${title}\n${items.map((item, index) => renderItem(item, index + 1, format)).join('\n')}`;
+  return `${title}\n${items.map((item, index) => renderBuyerItem(item, index + 1, format)).join('\n')}`;
 }
 
-function renderItem(item: ScoredObservation, index: number, format: DigestFormat): string {
+function renderBuyerItem(item: ScoredObservation, index: number, format: DigestFormat): string {
+  const priceLabel = formatPrice(item.price, item.currency, item.priceText);
+  const location = item.location ?? 'Unknown location';
+  const link = format === 'discord' ? `<${item.url}>` : item.url;
+  const angle = getBuyerAngle(item);
+  return `${index}) ${item.title} — ${priceLabel} — ${location}\n   ${angle} | ${link}`;
+}
+
+function renderFilteredSummary(summary: string[]): string {
+  return `🧹 FILTERED OUT\n- ${summary.join('\n- ')}`;
+}
+
+function renderBuyerFooter(input: DigestInput, sections: BuyerSections): string {
+  const failedProfiles = Object.keys(input.failedProfiles ?? {});
+  const footer: string[] = [
+    `Seen ${input.scored.length} listings • surfaced ${sections.topPicks.length + sections.worthALook.length} buyer-safe candidates`
+  ];
+
+  if (input.status !== 'success') footer.push(`Run status: ${input.status}`);
+  if (input.suspiciousProfiles.length > 0) footer.push(`Suspicious empty: ${input.suspiciousProfiles.join(', ')}`);
+  if (failedProfiles.length > 0) footer.push(`Failed profiles: ${failedProfiles.join(', ')}`);
+
+  return `ℹ️ FOOTER\n- ${footer.join('\n- ')}`;
+}
+
+function renderDebugSection(title: string, items: ScoredObservation[], format: DigestFormat): string | null {
+  if (items.length === 0) return null;
+  return `${title}\n${items.map((item, index) => renderDebugItem(item, index + 1, format)).join('\n')}`;
+}
+
+function renderDebugItem(item: ScoredObservation, index: number, format: DigestFormat): string {
   const priceLabel = formatPrice(item.price, item.currency, item.priceText);
   const badge = getAssessmentBadge(item.valuation.assessment);
   const location = item.location ?? 'Unknown location';
   const range = getRangeLabel(item);
-  const summary = summarizeForShortlist(item);
+  const summary = summarizeForDebug(item);
   const value = range ? `${getValueLabel(item.valuation.assessment)} vs ${range}` : getValueLabel(item.valuation.assessment);
   const link = format === 'discord' ? `<${item.url}>` : item.url;
   return `${index}) ${badge} ${item.title} — ${priceLabel} — ${location}\n   ${summary} | ${value} | ${link}`;
@@ -79,10 +155,12 @@ function renderRunNotes(input: DigestInput): string {
   const notes: string[] = [];
   const bundleCount = input.scored.filter((item) => item.valuation.classification.listingType === 'bundle_or_set').length;
   const withheldCount = input.scored.filter((item) => item.valuation.assessment === 'withheld' || item.valuation.assessment === 'uncertain').length;
-  if (bundleCount > 0) notes.push(`${bundleCount} bundle/set listing${bundleCount === 1 ? '' : 's'} were kept out of the shortlist unless unusually strong.`);
+  const accessoryCount = input.scored.filter((item) => item.valuation.classification.listingType === 'accessory_service_modification').length;
+  if (bundleCount > 0) notes.push(`${bundleCount} bundle/set listing${bundleCount === 1 ? '' : 's'} were kept out of buyer-facing top picks unless unusually strong.`);
+  if (accessoryCount > 0) notes.push(`${accessoryCount} accessory/modification listing${accessoryCount === 1 ? '' : 's'} were excluded from the buyer brief.`);
   if (withheldCount > 0) notes.push(`${withheldCount} noisy/unclear listing${withheldCount === 1 ? '' : 's'} were downgraded or withheld.`);
   if (notes.length === 0) notes.push('Clean run.');
-  return `🧠 NOTES\n- ${notes.slice(0, 2).join('\n- ')}`;
+  return `🧠 NOTES\n- ${notes.slice(0, 3).join('\n- ')}`;
 }
 
 function summarizeProfiles(profiles: SearchProfile[]): string {
@@ -105,31 +183,65 @@ function formatRunWindow(startedAt: string, finishedAt: string): string {
   return `${dateLabel} Melbourne${durationMinutes > 0 ? ` (${durationMinutes} min)` : ''}`;
 }
 
-function isShortlistItem(item: ScoredObservation): boolean {
-  return item.valuation.classification.listingType === 'single_item'
-    && item.valuation.classification.confidence !== 'low'
-    && item.valuation.assessment !== 'withheld'
-    && item.valuation.assessment !== 'uncertain'
-    && !hasHardFilterMiss(item)
-    && item.score >= 55;
+function isTopPick(item: ScoredObservation): boolean {
+  return isBuyerFacingSafe(item)
+    && item.valuation.assessment === 'attractive'
+    && item.score >= 70;
 }
 
-function isWatchlistItem(item: ScoredObservation): boolean {
-  const goodBundle = item.valuation.classification.listingType === 'bundle_or_set'
-    && item.valuation.classification.confidence !== 'low'
+function isWorthALook(item: ScoredObservation): boolean {
+  return isBuyerFacingSafe(item)
     && (item.valuation.assessment === 'attractive' || item.valuation.assessment === 'fair')
-    && item.score >= 50;
+    && item.score >= 52;
+}
 
-  const goodSingle = item.valuation.classification.listingType === 'single_item'
-    && item.valuation.classification.confidence !== 'low'
-    && item.valuation.assessment !== 'withheld'
-    && item.score >= 35;
+function isBuyerFacingSafe(item: ScoredObservation): boolean {
+  const listingType = item.valuation.classification.listingType;
+  const allowedListingType = listingType === 'single_item'
+    || (listingType === 'bundle_or_set' && item.valuation.classification.canDecomposeBundle);
+  if (!allowedListingType) return false;
+  if (item.valuation.classification.confidence === 'low') return false;
+  if (item.valuation.assessment === 'withheld' || item.valuation.assessment === 'uncertain') return false;
+  if (hasHardFilterMiss(item)) return false;
+  if (looksAccessoryOrModificationHeavy(item)) return false;
+  if (item.score < 45) return false;
+  return true;
+}
 
-  return !hasHardFilterMiss(item) && (goodSingle || goodBundle);
+function looksAccessoryOrModificationHeavy(item: ScoredObservation): boolean {
+  const haystack = [item.title, item.description, item.postedText, item.condition].filter(Boolean).join(' ').toLowerCase();
+  const hardTerms = [
+    'head only', 'shaft only', 'no head', 'no shaft', 'headcover only', 'grip only', 'grips', 'adapter', 'adaptor',
+    'tool', 'torque wrench', 'wrench', 'bag only', 'cover only', 'for parts', 'broken', 'reshaft', 'paint fill', 'paintfill'
+  ];
+
+  if (hardTerms.some((term) => haystack.includes(term))) return true;
+
+  return item.reasons.some((reason) => {
+    if (reason.code === 'UNWANTED_VARIANT' || reason.code === 'LISTING_TYPE_ACCESSORY_SERVICE') return true;
+    return /head only|shaft only|headcover only|adapter|adaptor|grip|cover only|bag only|tool|wrench|for parts|broken/i.test(reason.detail);
+  });
 }
 
 function hasHardFilterMiss(item: ScoredObservation): boolean {
   return item.reasons.some((reason) => reason.detail === 'Missing any required high-signal keyword for this profile' || reason.code === 'UNWANTED_VARIANT');
+}
+
+function buildFilteredSummary(scored: ScoredObservation[], sections: { topPicks: ScoredObservation[]; worthALook: ScoredObservation[] }): string[] {
+  const surfacedIds = new Set([...sections.topPicks, ...sections.worthALook].map((item) => item.externalId));
+  const filtered = scored.filter((item) => !surfacedIds.has(item.externalId));
+  const accessoryCount = filtered.filter((item) => looksAccessoryOrModificationHeavy(item) || item.valuation.classification.listingType === 'accessory_service_modification').length;
+  const bundleCount = filtered.filter((item) => item.valuation.classification.listingType === 'bundle_or_set').length;
+  const weakSignalCount = filtered.filter((item) => hasHardFilterMiss(item) || item.valuation.assessment === 'withheld' || item.valuation.assessment === 'uncertain' || item.score < 45).length;
+  const overpricedCount = filtered.filter((item) => item.valuation.assessment === 'overpriced').length;
+
+  const lines: string[] = [];
+  if (accessoryCount > 0) lines.push(`${accessoryCount} accessory / modification listing${accessoryCount === 1 ? '' : 's'} kept out of the buyer brief.`);
+  if (bundleCount > 0) lines.push(`${bundleCount} bundle / set listing${bundleCount === 1 ? '' : 's'} held back to avoid muddy comps.`);
+  if (weakSignalCount > 0) lines.push(`${weakSignalCount} weak-signal or unclear listing${weakSignalCount === 1 ? '' : 's'} omitted on trust grounds.`);
+  if (overpricedCount > 0) lines.push(`${overpricedCount} overpriced listing${overpricedCount === 1 ? '' : 's'} skipped.`);
+  if (lines.length === 0) lines.push('Nothing major was filtered beyond the surfaced picks.');
+  return lines.slice(0, 3);
 }
 
 function compareItems(a: ScoredObservation, b: ScoredObservation): number {
@@ -196,7 +308,7 @@ function getRangeLabel(item: ScoredObservation): string | null {
   return `${formatCurrency(low, item.currency)}–${formatCurrency(high, item.currency)}`;
 }
 
-function summarizeForShortlist(item: ScoredObservation): string {
+function summarizeForDebug(item: ScoredObservation): string {
   const positiveReasons = item.reasons
     .filter((reason) => reason.weight > 0)
     .sort((left, right) => right.weight - left.weight)
@@ -213,6 +325,20 @@ function summarizeForShortlist(item: ScoredObservation): string {
   ].filter(Boolean) as string[];
 
   return compact(parts.join(' | '), 140);
+}
+
+function getBuyerAngle(item: ScoredObservation): string {
+  const range = getRangeLabel(item);
+  const modelOrBrand = item.reasons
+    .filter((reason) => reason.code === 'MODEL_FAMILY_MATCH' || reason.code === 'BRAND_MATCH')
+    .sort((left, right) => right.weight - left.weight)
+    .slice(0, 2)
+    .map((reason) => reason.detail.replace(/^Brand match: /, '').replace(/^Model family match: /, ''));
+  const why = modelOrBrand.length > 0 ? modelOrBrand.join(', ') : item.valuation.classification.summary;
+  const value = item.valuation.assessment === 'attractive'
+    ? (range ? `priced well vs ${range}` : 'priced attractively')
+    : (range ? `roughly in the ${range} used range` : 'worth a closer look');
+  return compact(`${why} • ${value}`, 120);
 }
 
 function formatPrice(price?: number | null, currency?: string | null, priceText?: string | null): string {

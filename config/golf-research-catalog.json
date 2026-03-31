@@ -1,0 +1,147 @@
+{
+  "metadata": {
+    "description": "Deterministic local research seed for premium newly released / up-and-coming golf club families to watch on Marketplace.",
+    "market": "Melbourne",
+    "currency": "AUD",
+    "generatedFrom": [
+      "Local curated premium-club thesis",
+      "Current-generation / recent-release product families commonly discussed in 2025 premium golf coverage"
+    ]
+  },
+  "segments": [
+    {
+      "id": "premium-drivers",
+      "label": "Premium drivers",
+      "category": "golf",
+      "listingTypeScope": "single_item",
+      "baseQuery": "premium golf driver",
+      "searchTerms": ["driver", "10.5", "9.0", "stiff", "regular", "headcover"],
+      "priceBand": { "min": 300, "max": 1500 },
+      "accessoryExclusions": ["shaft only", "head only", "adapter", "headcover only", "bag", "broken", "for parts"],
+      "families": [
+        {
+          "brand": "Ping",
+          "family": "G440",
+          "queries": ["ping g440 driver", "ping g440 max driver", "ping g440 lst driver"],
+          "matchTerms": ["ping", "g440", "driver"],
+          "valuation": { "priceLow": 700, "priceHigh": 980, "confidence": "high", "notes": "Current-generation premium Ping driver family" }
+        },
+        {
+          "brand": "Titleist",
+          "family": "GT",
+          "queries": ["titleist gt driver", "titleist gt2 driver", "titleist gt3 driver"],
+          "matchTerms": ["titleist", "gt", "driver"],
+          "valuation": { "priceLow": 650, "priceHigh": 920, "confidence": "high", "notes": "Premium current-release Titleist GT driver family" }
+        },
+        {
+          "brand": "TaylorMade",
+          "family": "Qi35",
+          "queries": ["taylormade qi35 driver", "taylormade qi35 ls driver", "taylormade qi35 max driver"],
+          "matchTerms": ["taylormade", "qi35", "driver"],
+          "valuation": { "priceLow": 700, "priceHigh": 980, "confidence": "high", "notes": "Current-generation TaylorMade premium driver family" }
+        },
+        {
+          "brand": "Callaway",
+          "family": "Elyte",
+          "queries": ["callaway elyte driver", "callaway elyte triple diamond driver", "callaway elyte x driver"],
+          "matchTerms": ["callaway", "elyte", "driver"],
+          "valuation": { "priceLow": 680, "priceHigh": 950, "confidence": "high", "notes": "Current-generation Callaway premium driver family" }
+        },
+        {
+          "brand": "Srixon",
+          "family": "ZXi",
+          "queries": ["srixon zxi driver", "srixon zxi ls driver", "srixon zxi max driver"],
+          "matchTerms": ["srixon", "zxi", "driver"],
+          "valuation": { "priceLow": 520, "priceHigh": 820, "confidence": "medium", "notes": "Up-and-coming premium family with lower Marketplace volume but real resale interest" }
+        }
+      ]
+    },
+    {
+      "id": "premium-irons",
+      "label": "Premium irons",
+      "category": "golf",
+      "listingTypeScope": "bundle_or_set",
+      "baseQuery": "premium golf iron set",
+      "searchTerms": ["iron set", "4-pw", "5-pw", "4-p", "5-p", "stiff", "regular", "forged"],
+      "priceBand": { "min": 700, "max": 2600 },
+      "accessoryExclusions": ["single iron", "7 iron", "6 iron", "shaft only", "head only", "broken", "for parts"],
+      "families": [
+        {
+          "brand": "TaylorMade",
+          "family": "P790",
+          "queries": ["taylormade p790 irons", "taylormade p790 iron set"],
+          "matchTerms": ["taylormade", "p790", "iron"],
+          "valuation": { "priceLow": 1000, "priceHigh": 1700, "confidence": "high", "notes": "Flagship player-distance iron set with strong used liquidity" }
+        },
+        {
+          "brand": "Titleist",
+          "family": "T200",
+          "queries": ["titleist t200 irons", "titleist t200 iron set"],
+          "matchTerms": ["titleist", "t200", "iron"],
+          "valuation": { "priceLow": 1000, "priceHigh": 1650, "confidence": "high", "notes": "Premium player-distance iron set with reliable resale" }
+        },
+        {
+          "brand": "Titleist",
+          "family": "T150",
+          "queries": ["titleist t150 irons", "titleist t150 iron set"],
+          "matchTerms": ["titleist", "t150", "iron"],
+          "valuation": { "priceLow": 1100, "priceHigh": 1800, "confidence": "medium", "notes": "Premium newer players iron family" }
+        },
+        {
+          "brand": "Ping",
+          "family": "i530",
+          "queries": ["ping i530 irons", "ping i530 iron set"],
+          "matchTerms": ["ping", "i530", "iron"],
+          "valuation": { "priceLow": 1100, "priceHigh": 1850, "confidence": "medium", "notes": "Recent Ping premium iron family" }
+        },
+        {
+          "brand": "Mizuno",
+          "family": "JPX 925",
+          "queries": ["mizuno jpx 925 irons", "mizuno jpx 925 forged irons"],
+          "matchTerms": ["mizuno", "jpx 925", "iron"],
+          "valuation": { "priceLow": 950, "priceHigh": 1650, "confidence": "medium", "notes": "Recent Mizuno iron family with strong enthusiast appeal" }
+        },
+        {
+          "brand": "Srixon",
+          "family": "ZXi5",
+          "queries": ["srixon zxi5 irons", "srixon zxi iron set"],
+          "matchTerms": ["srixon", "zxi", "iron"],
+          "valuation": { "priceLow": 950, "priceHigh": 1600, "confidence": "medium", "notes": "Current Srixon iron family with growing premium interest" }
+        }
+      ]
+    },
+    {
+      "id": "premium-putters",
+      "label": "Premium putters",
+      "category": "golf",
+      "listingTypeScope": "single_item",
+      "baseQuery": "premium golf putter",
+      "searchTerms": ["putter", "34", "35", "headcover"],
+      "priceBand": { "min": 180, "max": 1200 },
+      "accessoryExclusions": ["headcover only", "shaft only", "broken", "for parts"],
+      "families": [
+        {
+          "brand": "Scotty Cameron",
+          "family": "Studio Style",
+          "queries": ["scotty cameron studio style putter", "scotty cameron newport studio style", "scotty cameron squareback studio style"],
+          "matchTerms": ["scotty", "cameron", "studio style", "putter"],
+          "valuation": { "priceLow": 520, "priceHigh": 850, "confidence": "high", "notes": "2025 Studio Style family should remain premium and liquid" }
+        },
+        {
+          "brand": "Odyssey",
+          "family": "Ai-ONE",
+          "queries": ["odyssey ai-one putter", "odyssey ai-one milled putter"],
+          "matchTerms": ["odyssey", "ai-one", "putter"],
+          "valuation": { "priceLow": 280, "priceHigh": 520, "confidence": "medium", "notes": "Recent Odyssey premium putter family" }
+        },
+        {
+          "brand": "TaylorMade",
+          "family": "Spider Tour",
+          "queries": ["taylormade spider tour putter", "taylormade spider tour x putter"],
+          "matchTerms": ["taylormade", "spider", "putter"],
+          "valuation": { "priceLow": 260, "priceHigh": 480, "confidence": "medium", "notes": "Popular premium mallet family with strong name recognition" }
+        }
+      ]
+    }
+  ]
+}
