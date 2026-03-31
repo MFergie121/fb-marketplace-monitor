@@ -6,6 +6,7 @@ import { migrate, openDatabase } from './db/database.js';
 import { createLogger } from './logging.js';
 import { runMonitor } from './run/runMonitor.js';
 import { loadMockRun } from './mocks/loadMockRun.js';
+import type { DigestFormat } from './digest/generateDigest.js';
 
 dotenv.config();
 
@@ -76,9 +77,13 @@ async function main(): Promise<void> {
         mockPath: mockPath ? path.resolve(mockPath) : undefined,
         logger
       });
+      const digestFormat = getDigestFormat();
+      const digestToPrint = result.digests[digestFormat];
       fs.mkdirSync(path.resolve('runtime'), { recursive: true });
-      fs.writeFileSync(path.resolve('runtime/latest-digest.txt'), result.digest, 'utf8');
-      console.log(result.digest);
+      fs.writeFileSync(path.resolve('runtime/latest-digest.txt'), digestToPrint, 'utf8');
+      fs.writeFileSync(path.resolve('runtime/latest-digest.discord.txt'), result.digests.discord, 'utf8');
+      fs.writeFileSync(path.resolve('runtime/latest-digest.email.txt'), result.digests.email, 'utf8');
+      console.log(digestToPrint);
       console.log(`\nRun ${result.runId} finished with status=${result.status}`);
       return;
     }
@@ -95,6 +100,13 @@ function getFlagValue(flag: string): string | undefined {
 
 function hasFlag(flag: string): boolean {
   return args.includes(flag);
+}
+
+function getDigestFormat(): DigestFormat {
+  const value = getFlagValue('--digest-format');
+  if (!value) return 'discord';
+  if (value === 'discord' || value === 'email') return value;
+  throw new Error(`Invalid --digest-format value: ${value}. Expected discord or email.`);
 }
 
 main().catch((error) => {

@@ -17,7 +17,7 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
 - Prevents single-item comps from being applied to bundles; fuzzy bundles get downgraded/withheld instead of fake precision
 - Penalises noisy patterns such as placeholder prices, `from $X`, `each`, quick-sale language, bulk/mixed bundles, and profile-configured unwanted variants
 - Boosts exact brands, configured model families, cleaner single-item listings, and relevant spec cues found in title or description
-- Generates Discord-friendly digest text with score explanations, valuation summaries (`attractive`, `fair`, `uncertain`, `overpriced`), and description snippets for enriched items
+- Generates mobile-friendly plain-text digests for both Discord and email, with compact labeled blocks, sectioned ranking, and cleaner link placement for phone reading
 - Detects suspicious empty runs and enforces a simple run lock
 - Supports a mock-data path so the full digest pipeline can be tested without live scraping
 - Emits step-level run logs so browser launch / profile progress / enrichment / digest generation are visible during live runs
@@ -143,6 +143,12 @@ Mock pipeline test:
 npm run run:mock
 ```
 
+Render the mock digest in email-friendly format:
+
+```bash
+npm run run:mock -- --digest-format email
+```
+
 Build / type-check:
 
 ```bash
@@ -167,18 +173,19 @@ If a profile stalls, the monitor should fail that profile after `FBM_PROFILE_TIM
 ## Outputs
 
 - SQLite DB: `runtime/fbm.sqlite`
-- Latest digest preview: `runtime/latest-digest.txt`
-- Generated digest copies are also stored in `notifications` for later integration work.
+- Latest digest preview in the selected CLI format: `runtime/latest-digest.txt`
+- Discord digest preview: `runtime/latest-digest.discord.txt`
+- Email digest preview: `runtime/latest-digest.email.txt`
+- Generated digest copies are also stored in `notifications` for later integration work (Discord preview payload).
 
-Digest rows now include:
+Digest output now includes:
 
-- parsed title-confidence (`high`, `medium`, `low`)
-- listing type + classification summary
-- risk flags for weak titles / placeholder pricing / detail enrichment / bundle valuation withholding
-- raw scoring reason codes with weights
-- valuation summary + supporting value sources/ranges
-- short description snippets when available
-- failed-profile summaries when a live scrape partially succeeds
+- separate Discord and email plain-text renderers
+- compact sectioned ranking (`TOP PICKS`, `WORTH CHECKING`, `BUNDLES / SETS`, `WITHHELD / UNCERTAIN`)
+- short labeled item blocks optimised for phone scanning
+- listing type, confidence, valuation, price, location, watch-outs, and link on every row
+- trailing `Link:` lines so raw URLs do less visual damage in email
+- compact summary/header lines plus failed-profile / suspicious-empty notes when relevant
 
 ## Suspicious-empty logic
 

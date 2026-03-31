@@ -164,6 +164,10 @@ export type RunResult = {
     errorMessage: string | null;
   }>;
   digest: string;
+  digests: {
+    discord: string;
+    email: string;
+  };
 };
 
 export type MockInput = {

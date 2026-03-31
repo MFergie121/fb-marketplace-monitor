@@ -78,7 +78,7 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
         : 'success';
     const finishedAt = new Date().toISOString();
     options.logger.info('Generating digest');
-    const digest = generateDigest({
+    const digestInput = {
       status,
       startedAt,
       finishedAt,
@@ -86,8 +86,12 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
       profiles: config.profiles.filter((item) => item.enabled),
       suspiciousProfiles,
       failedProfiles: collection.failures
-    });
-    insertNotification(db, runId, digest);
+    };
+    const digests = {
+      discord: generateDigest(digestInput, 'discord'),
+      email: generateDigest(digestInput, 'email')
+    };
+    insertNotification(db, runId, digests.discord);
     finishRun(db, runId, {
       status,
       finishedAt,
@@ -101,7 +105,7 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
     });
 
     options.logger.info(`Run ${runId} finished with status=${status}`);
-    return { runId, status, startedAt, finishedAt, profileSummaries, digest };
+    return { runId, status, startedAt, finishedAt, profileSummaries, digest: digests.discord, digests };
   } catch (error) {
     const finishedAt = new Date().toISOString();
     finishRun(db, runId, {
