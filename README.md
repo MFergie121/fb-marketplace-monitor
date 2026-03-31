@@ -8,6 +8,7 @@ Local Node.js/TypeScript sentinel for Facebook Marketplace deal-hunting.
   - `/Users/maxfergie/.openclaw/browser-profiles/fb-marketplace-monitor`
 - Reads config-driven Marketplace search profiles from JSON
 - Supports controlled per-profile search augmentation via named query expansions
+- Supports high-signal profile targeting with optional `requiredAnyKeywords` gates so broad searches can still prefer premium models rather than generic category junk
 - Collects visible listing cards from Marketplace search pages
 - Shortlists a small configurable top-N per profile and opens detail pages to capture richer fields, especially description text
 - Stores runs, listings, observations, and digest previews in SQLite
@@ -63,6 +64,7 @@ Search profiles live in `config/search-profiles.json`:
       "category": "sporting-goods",
       "brandPreferences": ["TaylorMade", "Titleist"],
       "modelFamilies": ["Stealth", "Paradym", "G430"],
+      "requiredAnyKeywords": ["stealth", "paradym", "g430"],
       "keywords": ["driver", "irons"],
       "unwantedKeywords": ["kids", "junior", "women's", "ladies"],
       "maxPrice": 1200,
@@ -77,6 +79,8 @@ Search profiles live in `config/search-profiles.json`:
 ```
 
 `searchExpansions` are optional extra Marketplace queries that roll back into the same profile. They are intentionally explicit and finite — no automatic synonym explosion.
+
+`requiredAnyKeywords` is an optional high-signal gate: if none of those terms appear in the listing title/description, the listing is heavily downgraded even if it matched broad category keywords. This is useful for keeping profiles broad enough to discover deals while avoiding random low-end or generic inventory.
 
 ### Valuation references
 

@@ -1,14 +1,14 @@
 {
   "profiles": [
     {
-      "profileId": "golf-clubs",
+      "profileId": "golf-premium-drivers",
       "items": [
         {
           "externalId": "mock-golf-1",
-          "title": "TaylorMade Stealth Driver 10.5",
+          "title": "TaylorMade Stealth 2 Driver 10.5",
           "url": "https://www.facebook.com/marketplace/item/mock-golf-1",
-          "price": 350,
-          "priceText": "AU$350",
+          "price": 430,
+          "priceText": "AU$430",
           "currency": "AUD",
           "location": "Richmond, VIC",
           "imageUrl": "https://example.com/driver.jpg",
@@ -39,28 +39,8 @@
         },
         {
           "externalId": "mock-golf-3",
-          "title": "AU$1",
-          "url": "https://www.facebook.com/marketplace/item/mock-golf-3",
-          "price": 1,
-          "priceText": "AU$1",
-          "currency": "AUD",
-          "location": "Melbourne, VIC",
-          "imageUrl": "https://example.com/mystery.jpg",
-          "sellerName": "Pat",
-          "description": "Need gone asap",
-          "postedText": "AU$1 | Melbourne, VIC",
-          "titleConfidence": "low",
-          "parserNotes": ["title_looks_like_price", "title_fallback_no_clean_candidate"]
-        }
-      ]
-    },
-    {
-      "profileId": "ping-driver",
-      "items": [
-        {
-          "externalId": "mock-ping-1",
           "title": "Ping G430 Max Driver 10.5",
-          "url": "https://www.facebook.com/marketplace/item/mock-ping-1",
+          "url": "https://www.facebook.com/marketplace/item/mock-golf-3",
           "price": 520,
           "priceText": "AU$520",
           "currency": "AUD",
@@ -71,6 +51,65 @@
           "condition": "Used - good",
           "detailCollectedAt": "2026-03-31T09:00:00.000Z",
           "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        },
+        {
+          "externalId": "mock-golf-4",
+          "title": "Ping driver",
+          "url": "https://www.facebook.com/marketplace/item/mock-golf-4",
+          "price": 250,
+          "priceText": "AU$250",
+          "currency": "AUD",
+          "location": "Melbourne, VIC",
+          "imageUrl": "https://example.com/generic-driver.jpg",
+          "sellerName": "Pat",
+          "description": "Good condition golf driver.",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        }
+      ]
+    },
+    {
+      "profileId": "golf-premium-irons",
+      "items": [
+        {
+          "externalId": "mock-irons-1",
+          "title": "TaylorMade P790 Iron Set 5-PW",
+          "url": "https://www.facebook.com/marketplace/item/mock-irons-1",
+          "price": 1100,
+          "priceText": "AU$1100",
+          "currency": "AUD",
+          "location": "South Yarra, VIC",
+          "imageUrl": "https://example.com/p790.jpg",
+          "sellerName": "Chris",
+          "description": "P790 set in good condition with stiff shafts.",
+          "condition": "Used - good",
+          "detailCollectedAt": "2026-03-31T09:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        }
+      ]
+    },
+    {
+      "profileId": "golf-premium-putters",
+      "items": [
+        {
+          "externalId": "mock-putter-1",
+          "title": "Scotty Cameron Phantom 5.5 Putter",
+          "url": "https://www.facebook.com/marketplace/item/mock-putter-1",
+          "price": 480,
+          "priceText": "AU$480",
+          "currency": "AUD",
+          "location": "Hawthorn, VIC",
+          "imageUrl": "https://example.com/scotty.jpg",
+          "sellerName": "Ben",
+          "description": "34 inch, headcover included, very tidy condition.",
+          "condition": "Used - good",
+          "detailCollectedAt": "2026-03-31T09:00:00.000Z",
+          "postedText": "Listed 3 hours ago",
           "titleConfidence": "high",
           "parserNotes": []
         }

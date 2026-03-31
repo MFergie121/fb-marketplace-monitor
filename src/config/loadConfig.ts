@@ -31,6 +31,7 @@ const profileSchema = z.object({
   brandPreferences: z.array(z.string()).default([]),
   keywords: z.array(z.string()).optional(),
   modelFamilies: z.array(z.string()).optional(),
+  requiredAnyKeywords: z.array(z.string().min(1)).optional(),
   unwantedKeywords: z.array(z.string()).optional(),
   maxPrice: z.number().optional(),
   minPrice: z.number().optional(),

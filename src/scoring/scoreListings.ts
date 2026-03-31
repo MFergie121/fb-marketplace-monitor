@@ -32,9 +32,21 @@ export function scoreListing(
     }
   }
 
+  let keywordMatches = 0;
   for (const keyword of profile.keywords ?? []) {
     if (includesTerm(haystack, keyword)) {
-      reasons.push({ code: 'KEYWORD_MATCH', weight: 12, detail: `Keyword match: ${keyword}` });
+      keywordMatches += 1;
+      reasons.push({ code: 'KEYWORD_MATCH', weight: 8, detail: `Keyword match: ${keyword}` });
+    }
+  }
+
+  const requiredAnyKeywords = profile.requiredAnyKeywords ?? [];
+  const requiredMatches = requiredAnyKeywords.filter((keyword) => includesTerm(haystack, keyword));
+  if (requiredAnyKeywords.length > 0) {
+    if (requiredMatches.length > 0) {
+      reasons.push({ code: 'SPECIFIC_LISTING', weight: 18, detail: `High-signal keyword match: ${requiredMatches.slice(0, 2).join(', ')}` });
+    } else {
+      reasons.push({ code: 'VAGUE_LISTING', weight: -70, detail: 'Missing any required high-signal keyword for this profile' });
     }
   }
 
@@ -100,6 +112,12 @@ export function scoreListing(
       reasons.push({ code: 'UNWANTED_VARIANT', weight: -24, detail: `Unwanted variant match: ${unwanted}` });
       break;
     }
+  }
+
+  const brandMatched = profile.brandPreferences.some((brand) => includesTerm(haystack, brand));
+  const modelMatched = (profile.modelFamilies ?? []).some((family) => includesTerm(haystack, family));
+  if (keywordMatches > 0 && !brandMatched && !modelMatched) {
+    reasons.push({ code: 'VAGUE_LISTING', weight: -24, detail: 'Generic keyword match without preferred brand/model signal' });
   }
 
   const specificity = scoreSpecificity(observation.title, observation.description);
@@ -218,6 +236,10 @@ function scoreSpecificity(title?: string | null, description?: string | null): {
   const titleText = normalize(title);
   const descriptionText = normalize(description);
   const result: { singleItemSignal?: string; specificListing?: string; vagueListing?: string } = {};
+
+  if (titleText.length > 0 && titleText.split(/\s+/).length <= 2) {
+    result.vagueListing = 'Very short title reads generic rather than model-specific';
+  }
 
   if (/\b(with|includes?|incl\.?|headcover|bindings|helmet bag|case)\b/i.test(`${titleText} ${descriptionText}`)) {
     result.singleItemSignal = 'Accessory/include wording suggests a concrete single listing';

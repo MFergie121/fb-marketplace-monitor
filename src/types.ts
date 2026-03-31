@@ -66,6 +66,7 @@ export type SearchProfile = {
   brandPreferences: string[];
   keywords?: string[];
   modelFamilies?: string[];
+  requiredAnyKeywords?: string[];
   unwantedKeywords?: string[];
   maxPrice?: number;
   minPrice?: number;
