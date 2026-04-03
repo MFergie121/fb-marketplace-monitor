@@ -13,7 +13,7 @@ The repo now has an explicit **two-pipeline shape**:
    - collector/scoring/digest logic stays mostly unchanged
    - buyer-facing digest output stays separate from debug/internal digests
 
-For the current POC, the default runtime scope is a single premium golf topic in Melbourne: **premium drivers**. Broader multi-topic sweeps are still supported, but they are now opt-in instead of the default.
+For the current POC, the default runtime scope is still a single premium golf topic in Melbourne: **premium drivers**. The difference now is that the active topic is selected explicitly via `config/topics/selection.json`, so switching to something else (for example **premium ski helmets**) no longer requires repo surgery.
 
 ## What it does
 
@@ -33,10 +33,13 @@ For the current POC, the default runtime scope is a single premium golf topic in
 
 ## Repo layout
 
-- `config/topics/golf-premium-topic.json` — Pipeline 1 input
+- `config/topics/all-topics.json` — main Pipeline 1 input containing multiple topic definitions
+- `config/topics/selection.json` — explicit current topic selection (`topicPath` + `activeTopicIds`)
+- `config/topics/golf-premium-topic.json` — older golf-only topic file kept for reference / focused experiments
 - `runtime/topic-catalog.json` — Pipeline 1 output / Pipeline 2 input
 - `config/search-profiles.json` — legacy static config path
 - `src/topics/catalog.ts` — topic + catalog loading/build logic
+- `src/topics/selection.ts` — selection file loading
 - `src/run/runMonitor.ts` — runtime execution pipeline
 - `runtime/latest-digest*.txt` — latest buyer/debug outputs
 
@@ -61,34 +64,63 @@ Environment variables are documented in `.env.example`.
 
 Important paths:
 
-- `FBM_TOPIC_PATH=./config/topics/golf-premium-topic.json`
+- `FBM_TOPIC_SELECTION_PATH=./config/topics/selection.json`
+- `FBM_TOPIC_PATH=./config/topics/all-topics.json` (optional override; normally the selection file points here)
 - `FBM_CATALOG_PATH=./runtime/topic-catalog.json`
 - `FBM_CONFIG_PATH=./config/search-profiles.json` (legacy mode only)
 
 POC-default runtime controls:
 
-- `FBM_ACTIVE_TOPIC_IDS=premium-drivers` keeps the default run explicitly focused on one active topic
+- `FBM_ACTIVE_TOPIC_IDS=premium-drivers` can override selection-file defaults when you want a temporary CLI/env switch
 - `FBM_MAX_QUERY_VARIANTS_PER_PROFILE=3` caps breadth to the highest-signal variants first
 - `FBM_STOP_AFTER_COLLECTED_COUNT=18` stops a profile early once enough cards are collected
 - `FBM_MAX_LISTINGS_PER_PROFILE=24` and `FBM_DETAIL_ENRICHMENT_TOP_N=3` keep the run bounded without making the buyer digest noisy
 
+## Topic selection: explicit and inspectable
+
+The default selection lives in `config/topics/selection.json`:
+
+```json
+{
+  "version": 1,
+  "topicPath": "./config/topics/all-topics.json",
+  "activeTopicIds": ["premium-drivers"]
+}
+```
+
+That means the monitor can now keep one shared topic-definition file with multiple topics inside it, while the current active topic stays obvious.
+
+Useful commands:
+
+```bash
+npm run topics:list
+npm run topics:list -- --topic-id ski-helmets-premium
+```
+
+Examples:
+
+- run the default golf POC: keep `activeTopicIds` as `premium-drivers`
+- switch to ski helmets: edit `config/topics/selection.json` to `"activeTopicIds": ["ski-helmets-premium"]`
+- do a one-off without editing files: pass `--topic-id ski-helmets-premium` or `--topic-ids premium-drivers,premium-putters`
+
 ## Pipeline 1: build the catalog
 
-Generate the inspectable catalog from topic definitions:
+Generate the inspectable catalog from the selected topic definition file and active topic ids:
 
 ```bash
 npm run catalog:build
 ```
 
-Or point at a custom topic file:
+Or point at a custom topic file explicitly:
 
 ```bash
-npm run catalog:build -- --topic ./config/topics/golf-premium-topic.json --out ./runtime/topic-catalog.json
+npm run catalog:build -- --topic ./config/topics/all-topics.json --out ./runtime/topic-catalog.json
 ```
 
 Override the active scope when you want a broader or different slice:
 
 ```bash
+npm run catalog:build -- --topic-id ski-helmets-premium
 npm run catalog:build -- --topic-ids premium-drivers,premium-putters
 ```
 
@@ -104,7 +136,7 @@ This writes a JSON catalog containing:
 
 ## Pipeline 2: run the monitor
 
-Default runtime path: load stored catalog and run. By default this is the **single-topic premium-drivers POC path**.
+Default runtime path: load stored catalog and run. By default this is still the **single-topic premium-drivers POC path**, but now that default comes from the explicit selection file.
 
 ```bash
 npm run run
@@ -122,9 +154,10 @@ Explicitly run from a stored catalog:
 npm run run:catalog
 ```
 
-Opt into a broader sweep for live testing:
+Run a different current topic without editing code:
 
 ```bash
+npm run run -- --topic-id ski-helmets-premium
 npm run run -- --topic-ids premium-drivers,premium-irons,premium-putters
 ```
 
@@ -162,7 +195,9 @@ Output: `runtime/research-generated-search-profiles.json`
 ```bash
 npm run check
 npm run build
+npm run topics:list
 npm run catalog:build
+npm run catalog:build -- --topic-id ski-helmets-premium
 npm run run:mock
 ```
 
@@ -181,4 +216,6 @@ npm run run:mock
 - Marketplace DOM changes may still require selector tuning.
 - No live Discord or Gmail sending is wired yet; this repo currently produces local buyer/debug digest artifacts ready for downstream delivery.
 - Detail enrichment remains intentionally conservative.
-- The default POC topic file is golf-focused, but the catalog structure is set up for additional topics later.
+- The default POC remains single-topic by design, but topic selection is now explicit and dynamic.
+- `all-topics.json` currently includes premium golf topics plus a conservative Melbourne-focused premium ski helmets topic (Oakley / Giro / POC).
+- Used protective gear is intentionally treated conservatively through tighter exclusions and valuation confidence.

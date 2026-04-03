@@ -114,6 +114,45 @@
           "parserNotes": []
         }
       ]
+    },
+    {
+      "profileId": "topic-ski-helmets-premium",
+      "items": [
+        {
+          "externalId": "mock-ski-helmet-1",
+          "title": "POC Obex MIPS ski helmet large",
+          "url": "https://www.facebook.com/marketplace/item/mock-ski-helmet-1",
+          "price": 140,
+          "priceText": "AU$140",
+          "currency": "AUD",
+          "location": "St Kilda, VIC",
+          "imageUrl": "https://example.com/poc-obex.jpg",
+          "sellerName": "Taylor",
+          "description": "Adult large POC Obex MIPS snow helmet in tidy condition. No crash history claimed.",
+          "condition": "Used - good",
+          "detailCollectedAt": "2026-04-04T08:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        },
+        {
+          "externalId": "mock-ski-helmet-2",
+          "title": "Oakley ski helmet crashed but usable",
+          "url": "https://www.facebook.com/marketplace/item/mock-ski-helmet-2",
+          "price": 50,
+          "priceText": "AU$50",
+          "currency": "AUD",
+          "location": "Melbourne, VIC",
+          "imageUrl": "https://example.com/oakley-helmet.jpg",
+          "sellerName": "Casey",
+          "description": "Oakley helmet after a small impact. Selling cheap.",
+          "condition": "Used - fair",
+          "detailCollectedAt": "2026-04-04T08:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        }
+      ]
     }
   ]
 }

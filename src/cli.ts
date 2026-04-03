@@ -7,6 +7,7 @@ import { createLogger } from './logging.js';
 import { runMonitor } from './run/runMonitor.js';
 import { loadMockRun } from './mocks/loadMockRun.js';
 import { buildCatalogFromTopics, buildConfigFromCatalog, loadCatalog, loadTopicDefinition, renderCatalogSummary } from './topics/catalog.js';
+import { loadTopicSelection } from './topics/selection.js';
 import type { DigestFormat } from './digest/generateDigest.js';
 import type { AppConfig, TopicCatalog } from './types.js';
 
@@ -21,7 +22,8 @@ const logger = createLogger(debug);
 const env = {
   dbPath: process.env.FBM_DB_PATH ?? './runtime/fbm.sqlite',
   configPath: process.env.FBM_CONFIG_PATH ?? './config/search-profiles.json',
-  topicPath: process.env.FBM_TOPIC_PATH ?? './config/topics/golf-premium-topic.json',
+  topicSelectionPath: process.env.FBM_TOPIC_SELECTION_PATH ?? './config/topics/selection.json',
+  topicPath: process.env.FBM_TOPIC_PATH,
   catalogPath: process.env.FBM_CATALOG_PATH ?? './runtime/topic-catalog.json',
   browserProfileDir: process.env.FBM_BROWSER_PROFILE_DIR ?? '/Users/maxfergie/.openclaw/browser-profiles/fb-marketplace-monitor',
   headless: String(process.env.FBM_HEADLESS ?? 'false') === 'true',
@@ -41,11 +43,22 @@ const env = {
 
 async function main(): Promise<void> {
   switch (command) {
+    case 'list-topics': {
+      const selection = resolveTopicSelection();
+      const topicPath = resolveTopicPath(selection);
+      const activeTopicIds = getActiveTopicIds(selection);
+      const catalog = applyRuntimeScope(buildCatalogFromTopics(loadTopicDefinition(topicPath), topicPath), activeTopicIds);
+      console.log(`Topic selection file: ${path.resolve(env.topicSelectionPath)}`);
+      console.log(`Topic definition file: ${path.resolve(topicPath)}`);
+      console.log(renderCatalogSummary(catalog));
+      return;
+    }
     case 'build-catalog': {
-      const topicPath = getFlagValue('--topic') ?? env.topicPath;
+      const selection = resolveTopicSelection();
+      const topicPath = resolveTopicPath(selection);
       const outputPath = path.resolve(getFlagValue('--out') ?? env.catalogPath);
       const definition = loadTopicDefinition(topicPath);
-      const catalog = applyRuntimeScope(buildCatalogFromTopics(definition, topicPath), getActiveTopicIds());
+      const catalog = applyRuntimeScope(buildCatalogFromTopics(definition, topicPath), getActiveTopicIds(selection));
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
       console.log(renderCatalogSummary(catalog));
@@ -53,10 +66,11 @@ async function main(): Promise<void> {
       return;
     }
     case 'build-research-config': {
-      const topicPath = getFlagValue('--topic') ?? env.topicPath;
+      const selection = resolveTopicSelection();
+      const topicPath = resolveTopicPath(selection);
       const outputPath = path.resolve(getFlagValue('--out') ?? './runtime/research-generated-search-profiles.json');
       const definition = loadTopicDefinition(topicPath);
-      const catalog = applyRuntimeScope(buildCatalogFromTopics(definition, topicPath), getActiveTopicIds());
+      const catalog = applyRuntimeScope(buildCatalogFromTopics(definition, topicPath), getActiveTopicIds(selection));
       const config = buildConfigFromCatalog(catalog);
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.writeFileSync(outputPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
@@ -127,10 +141,11 @@ async function main(): Promise<void> {
 }
 
 function resolveRuntimeConfig(): { config: AppConfig; sourceLabel: string; pipelineLabel: string; catalog?: TopicCatalog } {
+  const selection = resolveTopicSelection();
   const configPath = getFlagValue('--config') ?? env.configPath;
   const catalogPath = getFlagValue('--catalog') ?? env.catalogPath;
-  const topicPath = getFlagValue('--topic') ?? env.topicPath;
-  const activeTopicIds = getActiveTopicIds();
+  const topicPath = resolveTopicPath(selection);
+  const activeTopicIds = getActiveTopicIds(selection);
 
   if (hasFlag('--config')) {
     return {
@@ -175,13 +190,23 @@ function persistCatalogSnapshot(catalog: TopicCatalog, catalogPath: string): voi
   fs.writeFileSync(absolutePath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
 }
 
-function getActiveTopicIds(): string[] | undefined {
-  const fromFlag = getFlagValue('--topic-ids');
+function getActiveTopicIds(selection?: { activeTopicIds?: string[] }): string[] | undefined {
+  const fromFlag = getFlagValue('--topic-ids') ?? getFlagValue('--topic-id');
   const fromEnv = process.env.FBM_ACTIVE_TOPIC_IDS;
-  const raw = fromFlag ?? fromEnv;
+  const fromSelection = selection?.activeTopicIds?.join(',');
+  const raw = fromFlag ?? fromEnv ?? fromSelection;
   if (!raw) return undefined;
   const ids = raw.split(',').map((value) => value.trim()).filter(Boolean);
   return ids.length > 0 ? ids : undefined;
+}
+
+function resolveTopicSelection(): { topicPath: string; activeTopicIds: string[] } | undefined {
+  if (!fs.existsSync(path.resolve(env.topicSelectionPath))) return undefined;
+  return loadTopicSelection(env.topicSelectionPath);
+}
+
+function resolveTopicPath(selection?: { topicPath: string }): string {
+  return getFlagValue('--topic') ?? env.topicPath ?? selection?.topicPath ?? './config/topics/all-topics.json';
 }
 
 function applyRuntimeScope(catalog: TopicCatalog, activeTopicIds?: string[]): TopicCatalog {
