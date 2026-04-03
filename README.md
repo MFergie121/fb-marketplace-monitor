@@ -13,7 +13,7 @@ The repo now has an explicit **two-pipeline shape**:
    - collector/scoring/digest logic stays mostly unchanged
    - buyer-facing digest output stays separate from debug/internal digests
 
-For the current POC, the default topic set is premium golf in Melbourne.
+For the current POC, the default runtime scope is a single premium golf topic in Melbourne: **premium drivers**. Broader multi-topic sweeps are still supported, but they are now opt-in instead of the default.
 
 ## What it does
 
@@ -65,6 +65,13 @@ Important paths:
 - `FBM_CATALOG_PATH=./runtime/topic-catalog.json`
 - `FBM_CONFIG_PATH=./config/search-profiles.json` (legacy mode only)
 
+POC-default runtime controls:
+
+- `FBM_ACTIVE_TOPIC_IDS=premium-drivers` keeps the default run explicitly focused on one active topic
+- `FBM_MAX_QUERY_VARIANTS_PER_PROFILE=3` caps breadth to the highest-signal variants first
+- `FBM_STOP_AFTER_COLLECTED_COUNT=18` stops a profile early once enough cards are collected
+- `FBM_MAX_LISTINGS_PER_PROFILE=24` and `FBM_DETAIL_ENRICHMENT_TOP_N=3` keep the run bounded without making the buyer digest noisy
+
 ## Pipeline 1: build the catalog
 
 Generate the inspectable catalog from topic definitions:
@@ -79,6 +86,12 @@ Or point at a custom topic file:
 npm run catalog:build -- --topic ./config/topics/golf-premium-topic.json --out ./runtime/topic-catalog.json
 ```
 
+Override the active scope when you want a broader or different slice:
+
+```bash
+npm run catalog:build -- --topic-ids premium-drivers,premium-putters
+```
+
 This writes a JSON catalog containing:
 
 - topic ids / labels
@@ -91,7 +104,7 @@ This writes a JSON catalog containing:
 
 ## Pipeline 2: run the monitor
 
-Default runtime path: load stored catalog and run.
+Default runtime path: load stored catalog and run. By default this is the **single-topic premium-drivers POC path**.
 
 ```bash
 npm run run
@@ -107,6 +120,12 @@ Explicitly run from a stored catalog:
 
 ```bash
 npm run run:catalog
+```
+
+Opt into a broader sweep for live testing:
+
+```bash
+npm run run -- --topic-ids premium-drivers,premium-irons,premium-putters
 ```
 
 Legacy static-profile path:

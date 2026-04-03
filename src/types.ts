@@ -72,6 +72,10 @@ export type SearchProfile = {
   minPrice?: number;
   locationLabel?: string;
   searchExpansions?: SearchExpansion[];
+  runtime?: {
+    activeQueryVariantLimit?: number;
+    stopAfterCollectedCount?: number;
+  };
   valuationReferences?: ValuationReference[];
 };
 
@@ -115,7 +119,10 @@ export type TopicCatalog = {
     market?: string;
     currency?: string;
     description?: string;
+    scopeLabel?: string;
     activeTopicIds: string[];
+    queryVariantLimit?: number;
+    stopAfterCollectedCount?: number;
   };
   topics: CatalogTopic[];
 };

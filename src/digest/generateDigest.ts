@@ -211,7 +211,7 @@ function isBuyerFacingSafe(item: ScoredObservation): boolean {
 function looksAccessoryOrModificationHeavy(item: ScoredObservation): boolean {
   const haystack = [item.title, item.description, item.postedText, item.condition].filter(Boolean).join(' ').toLowerCase();
   const hardTerms = [
-    'head only', 'shaft only', 'no head', 'no shaft', 'headcover only', 'grip only', 'grips', 'adapter', 'adaptor',
+    'head only', 'shaft only', 'no head', 'no shaft', 'driver head', 'club head', 'headcover only', 'grip only', 'grips', 'adapter', 'adaptor',
     'tool', 'torque wrench', 'wrench', 'bag only', 'cover only', 'for parts', 'broken', 'reshaft', 'paint fill', 'paintfill'
   ];
 

@@ -17,6 +17,8 @@ export type RunOptions = {
   runTimeoutMs: number;
   profileTimeoutMs: number;
   maxListingsPerProfile: number;
+  maxQueryVariantsPerProfile: number;
+  stopAfterCollectedCount: number;
   detailEnrichmentTopN: number;
   detailWaitMs: number;
   retentionDays: number;
@@ -144,6 +146,8 @@ async function loadItems(config: AppConfig, options: RunOptions): Promise<{ item
     navTimeoutMs: options.navTimeoutMs,
     profileTimeoutMs: options.profileTimeoutMs,
     maxListingsPerProfile: options.maxListingsPerProfile,
+    maxQueryVariantsPerProfile: options.maxQueryVariantsPerProfile,
+    stopAfterCollectedCount: options.stopAfterCollectedCount,
     detailEnrichmentTopN: options.detailEnrichmentTopN,
     detailWaitMs: options.detailWaitMs,
     debug: options.debug,

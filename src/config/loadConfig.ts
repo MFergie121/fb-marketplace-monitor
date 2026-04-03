@@ -37,6 +37,10 @@ const profileSchema = z.object({
   minPrice: z.number().optional(),
   locationLabel: z.string().optional(),
   searchExpansions: z.array(searchExpansionSchema).optional(),
+  runtime: z.object({
+    activeQueryVariantLimit: z.number().int().positive().optional(),
+    stopAfterCollectedCount: z.number().int().positive().optional()
+  }).optional(),
   valuationReferences: z.array(valuationReferenceSchema).optional()
 });
 

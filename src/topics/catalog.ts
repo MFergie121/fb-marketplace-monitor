@@ -45,7 +45,10 @@ const catalogSchema = z.object({
     market: z.string().optional(),
     currency: z.string().optional(),
     description: z.string().optional(),
-    activeTopicIds: z.array(z.string()).default([])
+    scopeLabel: z.string().optional(),
+    activeTopicIds: z.array(z.string()).default([]),
+    queryVariantLimit: z.number().int().positive().optional(),
+    stopAfterCollectedCount: z.number().int().positive().optional()
   }).default({ activeTopicIds: [] }),
   topics: z.array(z.object({
     id: z.string().min(1),
@@ -84,6 +87,8 @@ const catalogSchema = z.object({
 
 const COMMON_UNWANTED = ['kids', 'junior', 'ladies', "women's", 'womens', 'bag', 'cover only'];
 const GENERIC_TERMS = ['driver', 'putter', 'irons', 'iron set', 'wedge', 'golf'];
+const DEFAULT_POC_QUERY_VARIANT_LIMIT = 3;
+const DEFAULT_POC_STOP_AFTER_COLLECTED_COUNT = 18;
 
 export function loadTopicDefinition(topicPath: string): TopicDefinition {
   const absolutePath = path.resolve(topicPath);
@@ -142,7 +147,12 @@ export function buildCatalogFromTopics(definition: TopicDefinition, sourceTopicP
     metadata: {
       sourceTopicPath: sourceTopicPath ? path.resolve(sourceTopicPath) : undefined,
       market: unique(definition.topics.map((topic) => topic.market))[0],
-      activeTopicIds: topics.filter((topic) => topic.enabled).map((topic) => topic.id)
+      scopeLabel: topics.filter((topic) => topic.enabled).length === 1
+        ? `POC single-topic focus: ${topics.find((topic) => topic.enabled)?.label ?? 'unknown'}`
+        : `Multi-topic sweep: ${topics.filter((topic) => topic.enabled).length} active topics`,
+      activeTopicIds: topics.filter((topic) => topic.enabled).map((topic) => topic.id),
+      queryVariantLimit: DEFAULT_POC_QUERY_VARIANT_LIMIT,
+      stopAfterCollectedCount: DEFAULT_POC_STOP_AFTER_COLLECTED_COUNT
     },
     topics
   };
@@ -175,6 +185,10 @@ export function buildConfigFromCatalog(catalog: TopicCatalog): AppConfig {
       minPrice: topic.priceBand.min,
       locationLabel: topic.locationLabel,
       searchExpansions,
+      runtime: {
+        activeQueryVariantLimit: catalog.metadata.queryVariantLimit,
+        stopAfterCollectedCount: catalog.metadata.stopAfterCollectedCount
+      },
       valuationReferences: topic.valuationReferences
     } satisfies SearchProfile;
   });
@@ -185,10 +199,15 @@ export function buildConfigFromCatalog(catalog: TopicCatalog): AppConfig {
 export function renderCatalogSummary(catalog: TopicCatalog): string {
   const lines: string[] = [];
   lines.push('Topic catalog');
+  lines.push(`- Scope: ${catalog.metadata.scopeLabel ?? 'unspecified'}`);
+  lines.push(`- Active topics: ${catalog.metadata.activeTopicIds.join(', ') || 'none'}`);
+  if (catalog.metadata.queryVariantLimit) lines.push(`- POC query variant cap: ${catalog.metadata.queryVariantLimit}`);
+  if (catalog.metadata.stopAfterCollectedCount) lines.push(`- Early stop after collected cards: ${catalog.metadata.stopAfterCollectedCount}`);
   for (const topic of catalog.topics) {
     lines.push(`- ${topic.label}`);
     lines.push(`  - Topic id: ${topic.id}`);
     lines.push(`  - Queries stored: ${topic.storedQueryTerms.length}`);
+    lines.push(`  - Enabled: ${topic.enabled ? 'yes' : 'no'}`);
     lines.push(`  - Brands: ${topic.brands.join(', ')}`);
     lines.push(`  - Families: ${topic.modelFamilies.join(', ')}`);
     lines.push(`  - Price band: ${topic.priceBand.min}-${topic.priceBand.max}`);

@@ -9,6 +9,8 @@ export type CollectorOptions = {
   navTimeoutMs: number;
   profileTimeoutMs: number;
   maxListingsPerProfile: number;
+  maxQueryVariantsPerProfile: number;
+  stopAfterCollectedCount: number;
   detailEnrichmentTopN: number;
   detailWaitMs: number;
   debug: boolean;
@@ -68,8 +70,12 @@ export async function collectMarketplaceListings(profiles: SearchProfile[], opti
 }
 
 async function collectProfile(context: BrowserContext, profile: SearchProfile, options: CollectorOptions): Promise<RawListing[]> {
-  const variants = buildSearchVariants(profile);
+  const variantLimit = profile.runtime?.activeQueryVariantLimit ?? options.maxQueryVariantsPerProfile;
+  const stopAfterCollectedCount = profile.runtime?.stopAfterCollectedCount ?? options.stopAfterCollectedCount;
+  const variants = buildSearchVariants(profile).slice(0, Math.max(1, variantLimit));
   const items: RawListing[] = [];
+
+  options.logger.info(`Profile ${profile.id}: running ${variants.length} query variant(s) (cap=${variantLimit}, early-stop=${stopAfterCollectedCount})`);
 
   for (const variant of variants) {
     options.logger.debug(`Profile ${profile.id}: variant ${variant.label} -> ${variant.url}`);
@@ -81,6 +87,10 @@ async function collectProfile(context: BrowserContext, profile: SearchProfile, o
       if (items.length >= options.maxListingsPerProfile) {
         return items.slice(0, options.maxListingsPerProfile);
       }
+      if (items.length >= stopAfterCollectedCount) {
+        options.logger.info(`Profile ${profile.id}: early stop after ${items.length} collected item(s)`);
+        return items;
+      }
     }
   }
 
@@ -88,9 +98,18 @@ async function collectProfile(context: BrowserContext, profile: SearchProfile, o
 }
 
 function buildSearchVariants(profile: SearchProfile): Array<{ label: string; url: string }> {
-  const variants: Array<{ label: string; url: string }> = [{ label: 'primary', url: profile.url }];
+  const variants: Array<{ label: string; url: string }> = [];
+  const seenUrls = new Set<string>();
+  const pushVariant = (label: string, url: string) => {
+    const key = new URL(url).toString();
+    if (seenUrls.has(key)) return;
+    seenUrls.add(key);
+    variants.push({ label, url: key });
+  };
+
+  pushVariant('primary', profile.url);
   for (const expansion of profile.searchExpansions ?? []) {
-    variants.push({ label: expansion.label, url: applySearchExpansion(profile.url, expansion) });
+    pushVariant(expansion.label, applySearchExpansion(profile.url, expansion));
   }
   return variants;
 }

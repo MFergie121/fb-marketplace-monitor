@@ -27,9 +27,11 @@ const env = {
   headless: String(process.env.FBM_HEADLESS ?? 'false') === 'true',
   navTimeoutMs: Number(process.env.FBM_NAV_TIMEOUT_MS ?? 45000),
   runTimeoutMs: Number(process.env.FBM_RUN_TIMEOUT_MS ?? 300000),
-  profileTimeoutMs: Number(process.env.FBM_PROFILE_TIMEOUT_MS ?? 90000),
-  maxListingsPerProfile: Number(process.env.FBM_MAX_LISTINGS_PER_PROFILE ?? 40),
-  detailEnrichmentTopN: Number(process.env.FBM_DETAIL_ENRICHMENT_TOP_N ?? 5),
+  profileTimeoutMs: Number(process.env.FBM_PROFILE_TIMEOUT_MS ?? 45000),
+  maxListingsPerProfile: Number(process.env.FBM_MAX_LISTINGS_PER_PROFILE ?? 24),
+  maxQueryVariantsPerProfile: Number(process.env.FBM_MAX_QUERY_VARIANTS_PER_PROFILE ?? 3),
+  stopAfterCollectedCount: Number(process.env.FBM_STOP_AFTER_COLLECTED_COUNT ?? 18),
+  detailEnrichmentTopN: Number(process.env.FBM_DETAIL_ENRICHMENT_TOP_N ?? 3),
   detailWaitMs: Number(process.env.FBM_DETAIL_WAIT_MS ?? 2500),
   retentionDays: Number(process.env.FBM_RETENTION_DAYS ?? 30),
   emptyResultsThreshold: Number(process.env.FBM_EMPTY_RESULTS_THRESHOLD ?? 2),
@@ -43,7 +45,7 @@ async function main(): Promise<void> {
       const topicPath = getFlagValue('--topic') ?? env.topicPath;
       const outputPath = path.resolve(getFlagValue('--out') ?? env.catalogPath);
       const definition = loadTopicDefinition(topicPath);
-      const catalog = buildCatalogFromTopics(definition, topicPath);
+      const catalog = applyRuntimeScope(buildCatalogFromTopics(definition, topicPath), getActiveTopicIds());
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
       console.log(renderCatalogSummary(catalog));
@@ -54,7 +56,7 @@ async function main(): Promise<void> {
       const topicPath = getFlagValue('--topic') ?? env.topicPath;
       const outputPath = path.resolve(getFlagValue('--out') ?? './runtime/research-generated-search-profiles.json');
       const definition = loadTopicDefinition(topicPath);
-      const catalog = buildCatalogFromTopics(definition, topicPath);
+      const catalog = applyRuntimeScope(buildCatalogFromTopics(definition, topicPath), getActiveTopicIds());
       const config = buildConfigFromCatalog(catalog);
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.writeFileSync(outputPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
@@ -95,8 +97,10 @@ async function main(): Promise<void> {
       if (profileFilter) logger.info(`Diagnostic mode: restricted to profile ${profileFilter}`);
       if (mockPath) logger.info(`Mock mode enabled with ${path.resolve(mockPath)}`);
       logger.info(pipelineLabel);
+      logger.info(`Runtime caps: queryVariants<=${env.maxQueryVariantsPerProfile}, stopAfterCollected>=${env.stopAfterCollectedCount}, maxListings<=${env.maxListingsPerProfile}, detailEnrichmentTopN<=${env.detailEnrichmentTopN}, profileTimeoutMs=${env.profileTimeoutMs}`);
       if (catalog) {
         persistCatalogSnapshot(catalog, env.catalogPath);
+        logger.info(`Catalog scope: ${catalog.metadata.scopeLabel ?? 'unspecified'}`);
         logger.info(`Catalog topics active: ${catalog.metadata.activeTopicIds.join(', ') || 'none'}`);
       }
 
@@ -126,6 +130,7 @@ function resolveRuntimeConfig(): { config: AppConfig; sourceLabel: string; pipel
   const configPath = getFlagValue('--config') ?? env.configPath;
   const catalogPath = getFlagValue('--catalog') ?? env.catalogPath;
   const topicPath = getFlagValue('--topic') ?? env.topicPath;
+  const activeTopicIds = getActiveTopicIds();
 
   if (hasFlag('--config')) {
     return {
@@ -136,7 +141,7 @@ function resolveRuntimeConfig(): { config: AppConfig; sourceLabel: string; pipel
   }
 
   if (hasFlag('--topic')) {
-    const catalog = buildCatalogFromTopics(loadTopicDefinition(topicPath), topicPath);
+    const catalog = applyRuntimeScope(buildCatalogFromTopics(loadTopicDefinition(topicPath), topicPath), activeTopicIds);
     return {
       catalog,
       config: buildConfigFromCatalog(catalog),
@@ -146,7 +151,7 @@ function resolveRuntimeConfig(): { config: AppConfig; sourceLabel: string; pipel
   }
 
   if (fs.existsSync(path.resolve(catalogPath))) {
-    const catalog = loadCatalog(catalogPath);
+    const catalog = applyRuntimeScope(loadCatalog(catalogPath), activeTopicIds);
     return {
       catalog,
       config: buildConfigFromCatalog(catalog),
@@ -155,7 +160,7 @@ function resolveRuntimeConfig(): { config: AppConfig; sourceLabel: string; pipel
     };
   }
 
-  const catalog = buildCatalogFromTopics(loadTopicDefinition(topicPath), topicPath);
+  const catalog = applyRuntimeScope(buildCatalogFromTopics(loadTopicDefinition(topicPath), topicPath), activeTopicIds);
   return {
     catalog,
     config: buildConfigFromCatalog(catalog),
@@ -168,6 +173,35 @@ function persistCatalogSnapshot(catalog: TopicCatalog, catalogPath: string): voi
   const absolutePath = path.resolve(catalogPath);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
   fs.writeFileSync(absolutePath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
+}
+
+function getActiveTopicIds(): string[] | undefined {
+  const fromFlag = getFlagValue('--topic-ids');
+  const fromEnv = process.env.FBM_ACTIVE_TOPIC_IDS;
+  const raw = fromFlag ?? fromEnv;
+  if (!raw) return undefined;
+  const ids = raw.split(',').map((value) => value.trim()).filter(Boolean);
+  return ids.length > 0 ? ids : undefined;
+}
+
+function applyRuntimeScope(catalog: TopicCatalog, activeTopicIds?: string[]): TopicCatalog {
+  const activeSet = activeTopicIds ? new Set(activeTopicIds) : null;
+  const topics = catalog.topics.map((topic) => ({
+    ...topic,
+    enabled: activeSet ? activeSet.has(topic.id) : topic.enabled
+  }));
+  const active = topics.filter((topic) => topic.enabled).map((topic) => topic.id);
+  return {
+    ...catalog,
+    topics,
+    metadata: {
+      ...catalog.metadata,
+      activeTopicIds: active,
+      scopeLabel: active.length === 1
+        ? `POC single-topic focus: ${topics.find((topic) => topic.enabled)?.label ?? active[0]}`
+        : `Multi-topic sweep: ${active.length} active topics`
+    }
+  };
 }
 
 function getFlagValue(flag: string): string | undefined {

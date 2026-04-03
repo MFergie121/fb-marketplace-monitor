@@ -54,7 +54,7 @@
     {
       "id": "premium-irons",
       "label": "Premium irons",
-      "enabled": true,
+      "enabled": false,
       "market": "melbourne",
       "locationLabel": "Melbourne",
       "category": "golf",
@@ -111,7 +111,7 @@
     {
       "id": "premium-putters",
       "label": "Premium putters",
-      "enabled": true,
+      "enabled": false,
       "market": "melbourne",
       "locationLabel": "Melbourne",
       "category": "golf",

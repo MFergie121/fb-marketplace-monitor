@@ -114,6 +114,11 @@ export function scoreListing(
     }
   }
 
+  const categoryMismatch = detectGolfCategoryMismatch(haystack, profile);
+  if (categoryMismatch) {
+    reasons.push({ code: 'UNWANTED_VARIANT', weight: -26, detail: categoryMismatch });
+  }
+
   const brandMatched = profile.brandPreferences.some((brand) => includesTerm(haystack, brand));
   const modelMatched = (profile.modelFamilies ?? []).some((family) => includesTerm(haystack, family));
   if (keywordMatches > 0 && !brandMatched && !modelMatched) {
@@ -148,6 +153,26 @@ export function scoreListing(
     isNewListing,
     valuation
   };
+}
+
+function detectGolfCategoryMismatch(haystack: string, profile: SearchProfile): string | null {
+  const wantsDriver = (profile.keywords ?? []).some((keyword) => keyword.toLowerCase() === 'driver');
+  const wantsPutter = (profile.keywords ?? []).some((keyword) => keyword.toLowerCase() === 'putter');
+  const wantsIronSet = (profile.keywords ?? []).some((keyword) => keyword.toLowerCase().includes('iron'));
+
+  if (wantsDriver && !includesTerm(haystack, 'driver') && /(hybrid|fairway wood|3 wood|5 wood|7 wood|wood\b)/i.test(haystack)) {
+    return 'Category mismatch: driver profile matched a non-driver club listing';
+  }
+
+  if (wantsPutter && !includesTerm(haystack, 'putter') && /(driver|hybrid|fairway wood|iron set|irons\b|wedge\b)/i.test(haystack)) {
+    return 'Category mismatch: putter profile matched a non-putter club listing';
+  }
+
+  if (wantsIronSet && !/(iron set|irons\b|4-pw|5-pw|4-p\b|5-p\b)/i.test(haystack) && /(driver|putter|hybrid|fairway wood|wedge\b)/i.test(haystack)) {
+    return 'Category mismatch: iron-set profile matched a non-iron listing';
+  }
+
+  return null;
 }
 
 function classificationReasons(valuation: ValuationContext): ScoreReason[] {
