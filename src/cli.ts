@@ -6,8 +6,9 @@ import { migrate, openDatabase } from './db/database.js';
 import { createLogger } from './logging.js';
 import { runMonitor } from './run/runMonitor.js';
 import { loadMockRun } from './mocks/loadMockRun.js';
-import { buildConfigFromResearchCatalog, loadResearchCatalog, renderResearchSummary } from './research/buildResearchConfig.js';
+import { buildCatalogFromTopics, buildConfigFromCatalog, loadCatalog, loadTopicDefinition, renderCatalogSummary } from './topics/catalog.js';
 import type { DigestFormat } from './digest/generateDigest.js';
+import type { AppConfig, TopicCatalog } from './types.js';
 
 dotenv.config();
 
@@ -20,7 +21,8 @@ const logger = createLogger(debug);
 const env = {
   dbPath: process.env.FBM_DB_PATH ?? './runtime/fbm.sqlite',
   configPath: process.env.FBM_CONFIG_PATH ?? './config/search-profiles.json',
-  researchCatalogPath: process.env.FBM_RESEARCH_CATALOG_PATH ?? './config/golf-research-catalog.json',
+  topicPath: process.env.FBM_TOPIC_PATH ?? './config/topics/golf-premium-topic.json',
+  catalogPath: process.env.FBM_CATALOG_PATH ?? './runtime/topic-catalog.json',
   browserProfileDir: process.env.FBM_BROWSER_PROFILE_DIR ?? '/Users/maxfergie/.openclaw/browser-profiles/fb-marketplace-monitor',
   headless: String(process.env.FBM_HEADLESS ?? 'false') === 'true',
   navTimeoutMs: Number(process.env.FBM_NAV_TIMEOUT_MS ?? 45000),
@@ -37,15 +39,27 @@ const env = {
 
 async function main(): Promise<void> {
   switch (command) {
+    case 'build-catalog': {
+      const topicPath = getFlagValue('--topic') ?? env.topicPath;
+      const outputPath = path.resolve(getFlagValue('--out') ?? env.catalogPath);
+      const definition = loadTopicDefinition(topicPath);
+      const catalog = buildCatalogFromTopics(definition, topicPath);
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
+      console.log(renderCatalogSummary(catalog));
+      console.log(`\nWrote topic catalog to ${outputPath}`);
+      return;
+    }
     case 'build-research-config': {
-      const catalogPath = getFlagValue('--catalog') ?? env.researchCatalogPath;
+      const topicPath = getFlagValue('--topic') ?? env.topicPath;
       const outputPath = path.resolve(getFlagValue('--out') ?? './runtime/research-generated-search-profiles.json');
-      const catalog = loadResearchCatalog(catalogPath);
-      const config = buildConfigFromResearchCatalog(catalog);
+      const definition = loadTopicDefinition(topicPath);
+      const catalog = buildCatalogFromTopics(definition, topicPath);
+      const config = buildConfigFromCatalog(catalog);
       fs.mkdirSync(path.dirname(outputPath), { recursive: true });
       fs.writeFileSync(outputPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
-      console.log(renderResearchSummary(config));
-      console.log(`\nWrote research-generated config to ${outputPath}`);
+      console.log(renderCatalogSummary(catalog));
+      console.log(`\nWrote catalog-derived config to ${outputPath}`);
       return;
     }
     case 'init-db': {
@@ -57,14 +71,8 @@ async function main(): Promise<void> {
       return;
     }
     case 'run': {
-      const configPath = getFlagValue('--config') ?? env.configPath;
-      const researchMode = shouldUseResearchMode(configPath);
-      const config = researchMode
-        ? buildConfigFromResearchCatalog(loadResearchCatalog(getFlagValue('--catalog') ?? env.researchCatalogPath))
-        : loadConfig(configPath);
-      logger.info(researchMode
-        ? `Startup: loading research catalog from ${path.resolve(getFlagValue('--catalog') ?? env.researchCatalogPath)}`
-        : `Startup: loading config from ${path.resolve(configPath)}`);
+      const { config, sourceLabel, pipelineLabel, catalog } = resolveRuntimeConfig();
+      logger.info(`Startup: ${sourceLabel}`);
       const profileFilter = getFlagValue('--profile');
       const filteredProfiles = profileFilter
         ? config.profiles.filter((profile) => profile.id === profileFilter)
@@ -78,20 +86,18 @@ async function main(): Promise<void> {
       const mockProfileIds = mockPath
         ? new Set(loadMockRun(path.resolve(mockPath)).profiles.map((profile) => profile.profileId))
         : null;
-      const effectiveConfig = {
+      const effectiveConfig: AppConfig = {
         profiles: mockProfileIds && !profileFilter
           ? filteredProfiles.filter((profile) => mockProfileIds.has(profile.id))
           : filteredProfiles
       };
       logger.info(`Config loaded: ${effectiveConfig.profiles.filter((profile) => profile.enabled).length} enabled profile(s)`);
-      if (profileFilter) {
-        logger.info(`Diagnostic mode: restricted to profile ${profileFilter}`);
-      }
-      if (mockPath) {
-        logger.info(`Mock mode enabled with ${path.resolve(mockPath)}`);
-      }
-      if (researchMode) {
-        logger.info('Research-first premium golf mode enabled: running monitor against research-generated profiles');
+      if (profileFilter) logger.info(`Diagnostic mode: restricted to profile ${profileFilter}`);
+      if (mockPath) logger.info(`Mock mode enabled with ${path.resolve(mockPath)}`);
+      logger.info(pipelineLabel);
+      if (catalog) {
+        persistCatalogSnapshot(catalog, env.catalogPath);
+        logger.info(`Catalog topics active: ${catalog.metadata.activeTopicIds.join(', ') || 'none'}`);
       }
 
       const result = await runMonitor(effectiveConfig, {
@@ -116,6 +122,54 @@ async function main(): Promise<void> {
   }
 }
 
+function resolveRuntimeConfig(): { config: AppConfig; sourceLabel: string; pipelineLabel: string; catalog?: TopicCatalog } {
+  const configPath = getFlagValue('--config') ?? env.configPath;
+  const catalogPath = getFlagValue('--catalog') ?? env.catalogPath;
+  const topicPath = getFlagValue('--topic') ?? env.topicPath;
+
+  if (hasFlag('--config')) {
+    return {
+      config: loadConfig(configPath),
+      sourceLabel: `loading static config from ${path.resolve(configPath)}`,
+      pipelineLabel: 'Pipeline 2: runtime consuming static profile config (legacy mode)'
+    };
+  }
+
+  if (hasFlag('--topic')) {
+    const catalog = buildCatalogFromTopics(loadTopicDefinition(topicPath), topicPath);
+    return {
+      catalog,
+      config: buildConfigFromCatalog(catalog),
+      sourceLabel: `building topic catalog in-memory from ${path.resolve(topicPath)}`,
+      pipelineLabel: 'Pipeline 2: runtime consuming topic-derived catalog built on demand'
+    };
+  }
+
+  if (fs.existsSync(path.resolve(catalogPath))) {
+    const catalog = loadCatalog(catalogPath);
+    return {
+      catalog,
+      config: buildConfigFromCatalog(catalog),
+      sourceLabel: `loading topic catalog from ${path.resolve(catalogPath)}`,
+      pipelineLabel: 'Pipeline 2: runtime consuming stored topic catalog'
+    };
+  }
+
+  const catalog = buildCatalogFromTopics(loadTopicDefinition(topicPath), topicPath);
+  return {
+    catalog,
+    config: buildConfigFromCatalog(catalog),
+    sourceLabel: `catalog missing, building from topic definition ${path.resolve(topicPath)}`,
+    pipelineLabel: 'Pipeline 2: runtime consuming topic-derived catalog (auto-built fallback)'
+  };
+}
+
+function persistCatalogSnapshot(catalog: TopicCatalog, catalogPath: string): void {
+  const absolutePath = path.resolve(catalogPath);
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  fs.writeFileSync(absolutePath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
+}
+
 function getFlagValue(flag: string): string | undefined {
   const index = args.findIndex((arg) => arg === flag);
   if (index === -1) return undefined;
@@ -124,12 +178,6 @@ function getFlagValue(flag: string): string | undefined {
 
 function hasFlag(flag: string): boolean {
   return args.includes(flag);
-}
-
-function shouldUseResearchMode(configPath: string): boolean {
-  if (hasFlag('--no-research')) return false;
-  if (hasFlag('--research')) return true;
-  return path.resolve(configPath) === path.resolve('./config/search-profiles.json');
 }
 
 function getDigestFormat(): DigestFormat {

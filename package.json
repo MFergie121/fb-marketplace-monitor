@@ -9,9 +9,11 @@
     "start": "node dist/cli.js",
     "dev": "tsx src/cli.ts",
     "run": "tsx src/cli.ts run",
-    "run:research": "tsx src/cli.ts run --research",
-    "run:legacy": "tsx src/cli.ts run --no-research --config ./config/search-profiles.json",
+    "run:catalog": "tsx src/cli.ts run --catalog ./runtime/topic-catalog.json",
+    "run:topic": "tsx src/cli.ts run --topic ./config/topics/golf-premium-topic.json",
+    "run:legacy": "tsx src/cli.ts run --config ./config/search-profiles.json",
     "run:mock": "tsx src/cli.ts run --mock ./mock-data/sample-run.json",
+    "catalog:build": "tsx src/cli.ts build-catalog",
     "research:build": "tsx src/cli.ts build-research-config",
     "db:init": "tsx src/cli.ts init-db"
   },

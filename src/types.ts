@@ -79,6 +79,79 @@ export type AppConfig = {
   profiles: SearchProfile[];
 };
 
+export type TopicCatalogQuery = {
+  label: string;
+  query: string;
+  kind: 'primary' | 'expansion';
+};
+
+export type CatalogTopic = {
+  id: string;
+  label: string;
+  enabled: boolean;
+  market: string;
+  locationLabel: string;
+  category: string;
+  listingTypeScope: Extract<ListingTypeScope, 'single_item' | 'bundle_or_set'>;
+  baseQuery: string;
+  storedQueryTerms: TopicCatalogQuery[];
+  searchTerms: string[];
+  exclusions: string[];
+  brands: string[];
+  modelFamilies: string[];
+  requiredAnyKeywords: string[];
+  priceBand: {
+    min: number;
+    max: number;
+  };
+  valuationReferences: ValuationReference[];
+};
+
+export type TopicCatalog = {
+  version: 1;
+  generatedAt: string;
+  metadata: {
+    sourceTopicPath?: string;
+    market?: string;
+    currency?: string;
+    description?: string;
+    activeTopicIds: string[];
+  };
+  topics: CatalogTopic[];
+};
+
+export type TopicDefinition = {
+  version: 1;
+  topics: Array<{
+    id: string;
+    label: string;
+    enabled: boolean;
+    market: string;
+    locationLabel: string;
+    category: string;
+    listingTypeScope: Extract<ListingTypeScope, 'single_item' | 'bundle_or_set'>;
+    baseQuery: string;
+    searchTerms: string[];
+    priceBand: {
+      min: number;
+      max: number;
+    };
+    exclusions: string[];
+    families: Array<{
+      brand: string;
+      family: string;
+      queries: string[];
+      matchTerms: string[];
+      valuation: {
+        priceLow: number;
+        priceHigh: number;
+        confidence?: 'high' | 'medium' | 'low';
+        notes?: string;
+      };
+    }>;
+  }>;
+};
+
 export type TitleConfidence = 'high' | 'medium' | 'low';
 
 export type RawListing = {
