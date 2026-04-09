@@ -12,14 +12,26 @@ export type DigestInput = {
   failedProfiles?: Record<string, string>;
 };
 
+type BuyerProfileSection = {
+  profile: SearchProfile;
+  topPicks: ScoredObservation[];
+  worthALook: ScoredObservation[];
+  buyerSafeCount: number;
+};
+
 type BuyerSections = {
+  byProfile: BuyerProfileSection[];
   topPicks: ScoredObservation[];
   worthALook: ScoredObservation[];
   filteredSummary: string[];
 };
 
+const PROFILE_TOP_PICK_CAP = 1;
+const PROFILE_WORTH_A_LOOK_CAP = 2;
+const PROFILE_TOTAL_SURFACED_CAP = 3;
+
 export function generateDigest(input: DigestInput, format: DigestFormat = 'discord'): string {
-  const sections = buildBuyerSections(input.scored);
+  const sections = buildBuyerSections(input.scored, input.profiles);
   const runTimeLabel = formatRunWindow(input.startedAt, input.finishedAt);
   const header = [
     'FB MARKETPLACE BUYER BRIEF',
@@ -28,8 +40,7 @@ export function generateDigest(input: DigestInput, format: DigestFormat = 'disco
   ];
 
   const blocks = [
-    renderBuyerSection('🔥 TOP PICKS', sections.topPicks, format),
-    renderBuyerSection('👀 WORTH A LOOK', sections.worthALook, format),
+    renderBuyerProfiles(sections.byProfile, format),
     renderFilteredSummary(sections.filteredSummary),
     renderBuyerFooter(input, sections)
   ].filter(Boolean) as string[];
@@ -41,11 +52,12 @@ export function generateDebugDigest(input: DigestInput, format: DigestFormat = '
   const sections = buildLegacySections(input.scored);
   const failedProfileIds = Object.keys(input.failedProfiles ?? {});
   const runTimeLabel = formatRunWindow(input.startedAt, input.finishedAt);
+  const buyerSections = buildBuyerSections(input.scored, input.profiles);
   const header = [
     'FB MARKETPLACE DEBUG DIGEST',
     `${runTimeLabel}`,
     `Profiles: ${summarizeProfiles(input.profiles)}`,
-    `Seen ${input.scored.length} • Buyer top picks ${buildBuyerSections(input.scored).topPicks.length}${sections.watchlist.length > 0 ? ` • Debug watchlist ${sections.watchlist.length}` : ''}`
+    `Seen ${input.scored.length} • Buyer top picks ${buyerSections.topPicks.length}${sections.watchlist.length > 0 ? ` • Debug watchlist ${sections.watchlist.length}` : ''}`
   ];
 
   if (input.status !== 'success') header.push(`Status: ${input.status}`);
@@ -61,25 +73,29 @@ export function generateDebugDigest(input: DigestInput, format: DigestFormat = '
   return [...header, '', ...blocks].join('\n\n').trim();
 }
 
-function buildBuyerSections(scored: ScoredObservation[]): BuyerSections {
-  const ranked = [...scored].sort(compareItems);
-  const buyerSafe = ranked.filter(isBuyerFacingSafe);
-  const topPicks: ScoredObservation[] = [];
-  const worthALook: ScoredObservation[] = [];
+function buildBuyerSections(scored: ScoredObservation[], profiles: SearchProfile[]): BuyerSections {
+  const byProfile = profiles.map((profile) => {
+    const ranked = scored
+      .filter((item) => item.profileId === profile.id)
+      .sort(compareItems);
+    const buyerSafe = ranked.filter(isBuyerFacingSafe);
+    const topPicks = buyerSafe.filter(isTopPick).slice(0, PROFILE_TOP_PICK_CAP);
+    const worthALook = buyerSafe
+      .filter((item) => isWorthALook(item) && !topPicks.some((pick) => pick.externalId === item.externalId))
+      .slice(0, Math.max(0, Math.min(PROFILE_WORTH_A_LOOK_CAP, PROFILE_TOTAL_SURFACED_CAP - topPicks.length)));
 
-  for (const item of buyerSafe) {
-    if (isTopPick(item) && topPicks.length < 3) {
-      topPicks.push(item);
-      continue;
-    }
+    return {
+      profile,
+      topPicks,
+      worthALook,
+      buyerSafeCount: buyerSafe.length
+    } satisfies BuyerProfileSection;
+  });
 
-    if (isWorthALook(item) && worthALook.length < 3) {
-      worthALook.push(item);
-    }
-  }
-
+  const topPicks = byProfile.flatMap((section) => section.topPicks);
+  const worthALook = byProfile.flatMap((section) => section.worthALook);
   const filteredSummary = buildFilteredSummary(scored, { topPicks, worthALook });
-  return { topPicks, worthALook, filteredSummary };
+  return { byProfile, topPicks, worthALook, filteredSummary };
 }
 
 function buildLegacySections(scored: ScoredObservation[]) {
@@ -105,9 +121,31 @@ function buildLegacySections(scored: ScoredObservation[]) {
   return { shortlist, watchlist };
 }
 
-function renderBuyerSection(title: string, items: ScoredObservation[], format: DigestFormat): string | null {
-  if (items.length === 0) return null;
-  return `${title}\n${items.map((item, index) => renderBuyerItem(item, index + 1, format)).join('\n')}`;
+function renderBuyerProfiles(sections: BuyerProfileSection[], format: DigestFormat): string {
+  const blocks = sections.map((section) => renderBuyerProfileSection(section, format));
+  return `🧭 BY ACTIVE SUBTOPIC\n${blocks.join('\n\n')}`;
+}
+
+function renderBuyerProfileSection(section: BuyerProfileSection, format: DigestFormat): string {
+  const surfaced = [...section.topPicks, ...section.worthALook];
+  const title = `• ${section.profile.label}`;
+
+  if (surfaced.length === 0) {
+    return `${title}\n  - No buyer-safe listings cleared the minimum quality floor this run.`;
+  }
+
+  const lines: string[] = [];
+  if (section.topPicks.length > 0) {
+    lines.push(...section.topPicks.map((item, index) => `  - 🔥 ${renderBuyerItem(item, index + 1, format)}`));
+  }
+  if (section.worthALook.length > 0) {
+    lines.push(...section.worthALook.map((item, index) => `  - 👀 ${renderBuyerItem(item, section.topPicks.length + index + 1, format)}`));
+  }
+  if (section.buyerSafeCount > surfaced.length) {
+    lines.push(`  - +${section.buyerSafeCount - surfaced.length} more buyer-safe option${section.buyerSafeCount - surfaced.length === 1 ? '' : 's'} in this subtopic.`);
+  }
+
+  return `${title}\n${lines.join('\n')}`;
 }
 
 function renderBuyerItem(item: ScoredObservation, index: number, format: DigestFormat): string {
@@ -115,7 +153,7 @@ function renderBuyerItem(item: ScoredObservation, index: number, format: DigestF
   const location = item.location ?? 'Unknown location';
   const link = format === 'discord' ? `<${item.url}>` : item.url;
   const angle = getBuyerAngle(item);
-  return `${index}) ${item.title} — ${priceLabel} — ${location}\n   ${angle} | ${link}`;
+  return `${index}) ${item.title} — ${priceLabel} — ${location}\n    ${angle} | ${link}`;
 }
 
 function renderFilteredSummary(summary: string[]): string {
@@ -124,10 +162,13 @@ function renderFilteredSummary(summary: string[]): string {
 
 function renderBuyerFooter(input: DigestInput, sections: BuyerSections): string {
   const failedProfiles = Object.keys(input.failedProfiles ?? {});
+  const profilesWithHits = sections.byProfile.filter((section) => section.topPicks.length + section.worthALook.length > 0).length;
+  const profilesWithoutHits = sections.byProfile.length - profilesWithHits;
   const footer: string[] = [
-    `Seen ${input.scored.length} listings • surfaced ${sections.topPicks.length + sections.worthALook.length} buyer-safe candidates`
+    `Seen ${input.scored.length} listings • surfaced ${sections.topPicks.length + sections.worthALook.length} buyer-safe candidates across ${profilesWithHits}/${sections.byProfile.length} active subtopics`
   ];
 
+  if (profilesWithoutHits > 0) footer.push(`${profilesWithoutHits} active subtopic${profilesWithoutHits === 1 ? '' : 's'} had no listings strong enough to include.`);
   if (input.status !== 'success') footer.push(`Run status: ${input.status}`);
   if (input.suspiciousProfiles.length > 0) footer.push(`Suspicious empty: ${input.suspiciousProfiles.join(', ')}`);
   if (failedProfiles.length > 0) footer.push(`Failed profiles: ${failedProfiles.join(', ')}`);
