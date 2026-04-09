@@ -153,6 +153,123 @@
           "parserNotes": []
         }
       ]
+    },
+    {
+      "profileId": "topic-custom-mens-skis-170-180cm",
+      "items": [
+        {
+          "externalId": "mock-custom-skis-1",
+          "title": "Blizzard Brahma skis 177cm mens",
+          "url": "https://www.facebook.com/marketplace/item/mock-custom-skis-1",
+          "price": 420,
+          "priceText": "AU$420",
+          "currency": "AUD",
+          "location": "Melbourne, VIC",
+          "imageUrl": "https://example.com/skis-177.jpg",
+          "sellerName": "Miles",
+          "description": "Adult men's all mountain skis, 177cm, tidy bases.",
+          "condition": "Used - good",
+          "detailCollectedAt": "2026-04-10T08:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        },
+        {
+          "externalId": "mock-custom-skis-2",
+          "title": "Kids skis 140cm package",
+          "url": "https://www.facebook.com/marketplace/item/mock-custom-skis-2",
+          "price": 90,
+          "priceText": "AU$90",
+          "currency": "AUD",
+          "location": "Melbourne, VIC",
+          "imageUrl": "https://example.com/kids-skis.jpg",
+          "sellerName": "Lee",
+          "description": "Junior skis with poles.",
+          "condition": "Used - fair",
+          "detailCollectedAt": "2026-04-10T08:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        }
+      ]
+    },
+    {
+      "profileId": "topic-custom-mens-ski-helmet",
+      "items": [
+        {
+          "externalId": "mock-custom-helmet-1",
+          "title": "Smith adult ski helmet MIPS medium",
+          "url": "https://www.facebook.com/marketplace/item/mock-custom-helmet-1",
+          "price": 95,
+          "priceText": "AU$95",
+          "currency": "AUD",
+          "location": "Fitzroy, VIC",
+          "imageUrl": "https://example.com/smith-helmet.jpg",
+          "sellerName": "Jesse",
+          "description": "Adult snow helmet, no crash history, good condition.",
+          "condition": "Used - good",
+          "detailCollectedAt": "2026-04-10T08:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        },
+        {
+          "externalId": "mock-custom-helmet-2",
+          "title": "Giro bike helmet used",
+          "url": "https://www.facebook.com/marketplace/item/mock-custom-helmet-2",
+          "price": 35,
+          "priceText": "AU$35",
+          "currency": "AUD",
+          "location": "Melbourne, VIC",
+          "imageUrl": "https://example.com/bike-helmet.jpg",
+          "sellerName": "Pat",
+          "description": "Cycling helmet, used heaps.",
+          "condition": "Used - fair",
+          "detailCollectedAt": "2026-04-10T08:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        }
+      ]
+    },
+    {
+      "profileId": "topic-custom-driving-irons",
+      "items": [
+        {
+          "externalId": "mock-custom-driving-iron-1",
+          "title": "Titleist U505 3 iron driving iron stiff",
+          "url": "https://www.facebook.com/marketplace/item/mock-custom-driving-iron-1",
+          "price": 210,
+          "priceText": "AU$210",
+          "currency": "AUD",
+          "location": "Richmond, VIC",
+          "imageUrl": "https://example.com/u505.jpg",
+          "sellerName": "Jordan",
+          "description": "Single utility iron in good condition.",
+          "condition": "Used - good",
+          "detailCollectedAt": "2026-04-10T08:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        },
+        {
+          "externalId": "mock-custom-driving-iron-2",
+          "title": "Cleveland wedge set and shafts",
+          "url": "https://www.facebook.com/marketplace/item/mock-custom-driving-iron-2",
+          "price": 120,
+          "priceText": "AU$120",
+          "currency": "AUD",
+          "location": "Melbourne, VIC",
+          "imageUrl": "https://example.com/wedges.jpg",
+          "sellerName": "Sam",
+          "description": "Bundle with wedge heads and spare shafts.",
+          "condition": "Used - fair",
+          "detailCollectedAt": "2026-04-10T08:00:00.000Z",
+          "postedText": "Listed today",
+          "titleConfidence": "high",
+          "parserNotes": []
+        }
+      ]
     }
   ]
 }

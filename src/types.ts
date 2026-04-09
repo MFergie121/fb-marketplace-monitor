@@ -96,6 +96,9 @@ export type CatalogTopic = {
   market: string;
   locationLabel: string;
   category: string;
+  sourceTopicId: string;
+  sourceTopicLabel: string;
+  groupIds: string[];
   listingTypeScope: Extract<ListingTypeScope, 'single_item' | 'bundle_or_set'>;
   baseQuery: string;
   storedQueryTerms: TopicCatalogQuery[];
@@ -145,10 +148,20 @@ export type TopicDefinition = {
     };
     exclusions: string[];
     families: Array<{
+      id?: string;
+      label?: string;
       brand: string;
       family: string;
       queries: string[];
       matchTerms: string[];
+      searchTerms?: string[];
+      exclusions?: string[];
+      listingTypeScope?: Extract<ListingTypeScope, 'single_item' | 'bundle_or_set'>;
+      category?: string;
+      priceBand?: {
+        min: number;
+        max: number;
+      };
       valuation: {
         priceLow: number;
         priceHigh: number;

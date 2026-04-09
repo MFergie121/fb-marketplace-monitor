@@ -101,6 +101,8 @@ Examples:
 
 - run the default golf POC: keep `activeTopicIds` as `premium-drivers`
 - switch to ski helmets: edit `config/topics/selection.json` to `"activeTopicIds": ["ski-helmets-premium"]`
+- run the custom query container as a group: use `--topic-id custom`
+- target a single custom subtopic directly: use `--topic-id custom-driving-irons` (or another generated custom topic id)
 - do a one-off without editing files: pass `--topic-id ski-helmets-premium` or `--topic-ids premium-drivers,premium-putters`
 
 ## Pipeline 1: build the catalog
@@ -132,6 +134,7 @@ This writes a JSON catalog containing:
 - required keywords
 - exclusions
 - valuation references
+- group ids (so a container like `custom` can fan out into multiple focused runtime profiles)
 - topic metadata and generated timestamp
 
 ## Pipeline 2: run the monitor

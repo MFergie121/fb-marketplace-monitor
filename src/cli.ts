@@ -213,7 +213,7 @@ function applyRuntimeScope(catalog: TopicCatalog, activeTopicIds?: string[]): To
   const activeSet = activeTopicIds ? new Set(activeTopicIds) : null;
   const topics = catalog.topics.map((topic) => ({
     ...topic,
-    enabled: activeSet ? activeSet.has(topic.id) : topic.enabled
+    enabled: activeSet ? topic.groupIds.some((groupId) => activeSet.has(groupId)) || activeSet.has(topic.id) : topic.enabled
   }));
   const active = topics.filter((topic) => topic.enabled).map((topic) => topic.id);
   return {
