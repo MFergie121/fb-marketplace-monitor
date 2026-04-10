@@ -1,6 +1,7 @@
 import type { RunStatus, ScoredObservation, SearchProfile, ValuationAssessment } from '../types.js';
 
 export type DigestFormat = 'discord' | 'email';
+export type BuyerBucket = 'top_pick' | 'worth_a_look';
 
 export type DigestInput = {
   status: RunStatus;
@@ -24,6 +25,12 @@ type BuyerSections = {
   topPicks: ScoredObservation[];
   worthALook: ScoredObservation[];
   filteredSummary: string[];
+};
+
+export type BuyerCandidate = {
+  bucket: BuyerBucket;
+  profile: SearchProfile;
+  item: ScoredObservation;
 };
 
 const PROFILE_TOP_PICK_CAP = 1;
@@ -71,6 +78,14 @@ export function generateDebugDigest(input: DigestInput, format: DigestFormat = '
   ].filter(Boolean) as string[];
 
   return [...header, '', ...blocks].join('\n\n').trim();
+}
+
+export function collectBuyerCandidates(scored: ScoredObservation[], profiles: SearchProfile[]): BuyerCandidate[] {
+  const sections = buildBuyerSections(scored, profiles);
+  return sections.byProfile.flatMap((section) => [
+    ...section.topPicks.map((item) => ({ bucket: 'top_pick' as const, profile: section.profile, item })),
+    ...section.worthALook.map((item) => ({ bucket: 'worth_a_look' as const, profile: section.profile, item }))
+  ]);
 }
 
 function buildBuyerSections(scored: ScoredObservation[], profiles: SearchProfile[]): BuyerSections {
@@ -152,7 +167,7 @@ function renderBuyerItem(item: ScoredObservation, index: number, format: DigestF
   const priceLabel = formatPrice(item.price, item.currency, item.priceText);
   const location = item.location ?? 'Unknown location';
   const link = format === 'discord' ? `<${item.url}>` : item.url;
-  const angle = getBuyerAngle(item);
+  const angle = describeBuyerAngle(item);
   return `${index}) ${item.title} — ${priceLabel} — ${location}\n    ${angle} | ${link}`;
 }
 
@@ -368,7 +383,7 @@ function summarizeForDebug(item: ScoredObservation): string {
   return compact(parts.join(' | '), 140);
 }
 
-function getBuyerAngle(item: ScoredObservation): string {
+export function describeBuyerAngle(item: ScoredObservation): string {
   const range = getRangeLabel(item);
   const modelOrBrand = item.reasons
     .filter((reason) => reason.code === 'MODEL_FAMILY_MATCH' || reason.code === 'BRAND_MATCH')

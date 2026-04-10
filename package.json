@@ -13,6 +13,7 @@
     "run:topic": "tsx src/cli.ts run --topic ./config/topics/all-topics.json",
     "run:legacy": "tsx src/cli.ts run --config ./config/search-profiles.json",
     "run:mock": "tsx src/cli.ts run --mock ./mock-data/sample-run.json",
+    "daily:digest": "tsx src/cli.ts daily-digest",
     "catalog:build": "tsx src/cli.ts build-catalog",
     "research:build": "tsx src/cli.ts build-research-config",
     "topics:list": "tsx src/cli.ts list-topics",

@@ -28,8 +28,9 @@ For the current POC, the default runtime scope is still a single premium golf to
 - Generates:
   - buyer-facing Discord/email digest previews
   - separate debug Discord/email digest previews
-- Stores runs, observations, and notification previews in SQLite
+- Stores runs, observations, digest-candidate snapshots, and notification previews in SQLite
 - Supports mock runs for safe end-to-end verification
+- Supports 4-hour collection runs plus one daily aggregated buyer digest artifact for Discord delivery
 
 ## Repo layout
 
@@ -75,6 +76,7 @@ POC-default runtime controls:
 - `FBM_MAX_QUERY_VARIANTS_PER_PROFILE=3` caps breadth to the highest-signal variants first
 - `FBM_STOP_AFTER_COLLECTED_COUNT=18` stops a profile early once enough cards are collected
 - `FBM_MAX_LISTINGS_PER_PROFILE=24` and `FBM_DETAIL_ENRICHMENT_TOP_N=3` keep the run bounded without making the buyer digest noisy
+- `FBM_DAILY_DIGEST_DISCORD_CHANNEL_ID=1487057203105108000` pins the intended Discord delivery target for the once-daily digest artifact
 
 ## Topic selection: explicit and inspectable
 
@@ -181,6 +183,18 @@ Mock pipeline verification:
 ```bash
 npm run run:mock
 npm run run:mock -- --digest-format email
+npm run daily:digest
+```
+
+Daily aggregation / digest generation:
+
+```bash
+# collect candidates on a normal run (live or mock)
+npm run run
+
+# build one digest from the current Melbourne day window
+npm run daily:digest
+npm run daily:digest -- --date 2026-04-10
 ```
 
 ## Backwards-compatible helper
@@ -208,16 +222,19 @@ npm run run:mock
 
 - SQLite DB: `runtime/fbm.sqlite`
 - Stored catalog: `runtime/topic-catalog.json`
-- Latest digest preview: `runtime/latest-digest.txt`
+- Latest run digest preview: `runtime/latest-digest.txt`
 - Discord digest preview: `runtime/latest-digest.discord.txt`
 - Email digest preview: `runtime/latest-digest.email.txt`
 - Debug Discord digest preview: `runtime/latest-digest.debug.discord.txt`
 - Debug email digest preview: `runtime/latest-digest.debug.email.txt`
+- Daily Discord digest preview: `runtime/daily-digest.discord.txt`
+- Daily email digest preview: `runtime/daily-digest.email.txt`
+- Daily digest metadata for downstream delivery: `runtime/daily-digest.meta.json`
 
 ## Notes / limitations
 
 - Marketplace DOM changes may still require selector tuning.
-- No live Discord or Gmail sending is wired yet; this repo currently produces local buyer/debug digest artifacts ready for downstream delivery.
+- No direct Discord API sending is wired in this repo; instead it produces local buyer/debug/daily digest artifacts plus channel metadata ready for downstream OpenClaw delivery.
 - Detail enrichment remains intentionally conservative.
 - The default POC remains single-topic by design, but topic selection is now explicit and dynamic.
 - `all-topics.json` currently includes premium golf topics plus a conservative Melbourne-focused premium ski helmets topic (Oakley / Giro / POC).

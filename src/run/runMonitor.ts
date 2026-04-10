@@ -2,8 +2,8 @@ import path from 'node:path';
 import type { Logger } from '../logging.js';
 import type { AppConfig, ListingObservation, RawListing, RunResult, RunStatus, ScoredObservation } from '../types.js';
 import { collectMarketplaceListings } from '../collector/marketplaceCollector.js';
-import { openDatabase, migrate, createRun, finishRun, upsertListing, insertObservation, insertNotification, getRecentObservedCounts, cleanupOldData } from '../db/database.js';
-import { generateDebugDigest, generateDigest } from '../digest/generateDigest.js';
+import { openDatabase, migrate, createRun, finishRun, upsertListing, insertObservation, insertNotification, getRecentObservedCounts, cleanupOldData, insertDigestCandidate } from '../db/database.js';
+import { collectBuyerCandidates, describeBuyerAngle, generateDebugDigest, generateDigest } from '../digest/generateDigest.js';
 import { loadMockRun } from '../mocks/loadMockRun.js';
 import { acquireRunLock, releaseRunLock } from './lock.js';
 import { scoreListing } from '../scoring/scoreListings.js';
@@ -46,6 +46,7 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
     const observedAt = new Date().toISOString();
     const collection = await withTimeout(loadItems(config, options), options.runTimeoutMs, 'Run timed out');
     const scored: ScoredObservation[] = [];
+    const listingIdByExternalProfileKey = new Map<string, number>();
     const profileSummaries: RunResult['profileSummaries'] = [];
     const suspiciousProfiles: string[] = [];
 
@@ -70,6 +71,7 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
         const scoredObservation = scoreListing(observation, profile, isNew, valuation);
         insertObservation(db, runId, listingId, scoredObservation);
         scored.push(scoredObservation);
+        listingIdByExternalProfileKey.set(`${profile.id}:${item.externalId}`, listingId);
       }
     }
 
@@ -95,6 +97,22 @@ export async function runMonitor(config: AppConfig, options: RunOptions): Promis
       debugDiscord: generateDebugDigest(digestInput, 'discord'),
       debugEmail: generateDebugDigest(digestInput, 'email')
     };
+
+    for (const candidate of collectBuyerCandidates(scored, digestInput.profiles)) {
+      const listingId = listingIdByExternalProfileKey.get(`${candidate.profile.id}:${candidate.item.externalId}`);
+      if (!listingId) continue;
+      insertDigestCandidate(db, {
+        runId,
+        listingId,
+        profileId: candidate.profile.id,
+        bucket: candidate.bucket,
+        score: candidate.item.score,
+        valuationAssessment: candidate.item.valuation.assessment,
+        buyerAngle: describeBuyerAngle(candidate.item),
+        createdAt: finishedAt
+      });
+    }
+
     insertNotification(db, runId, digests.discord);
     finishRun(db, runId, {
       status,

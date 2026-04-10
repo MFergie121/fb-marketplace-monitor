@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import dotenv from 'dotenv';
 import { loadConfig } from './config/loadConfig.js';
-import { migrate, openDatabase } from './db/database.js';
+import { getDailyDigestCandidates, getRunSummariesInWindow, insertNotification, migrate, openDatabase } from './db/database.js';
 import { createLogger } from './logging.js';
 import { runMonitor } from './run/runMonitor.js';
 import { loadMockRun } from './mocks/loadMockRun.js';
 import { buildCatalogFromTopics, buildConfigFromCatalog, loadCatalog, loadTopicDefinition, renderCatalogSummary } from './topics/catalog.js';
 import { loadTopicSelection } from './topics/selection.js';
+import { generateDailyDigest } from './digest/generateDailyDigest.js';
 import type { DigestFormat } from './digest/generateDigest.js';
 import type { AppConfig, TopicCatalog } from './types.js';
 
@@ -38,6 +39,7 @@ const env = {
   retentionDays: Number(process.env.FBM_RETENTION_DAYS ?? 30),
   emptyResultsThreshold: Number(process.env.FBM_EMPTY_RESULTS_THRESHOLD ?? 2),
   suspiciousEmptyMinProfiles: Number(process.env.FBM_SUSPICIOUS_EMPTY_MIN_PROFILES ?? 1),
+  dailyDigestChannelId: process.env.FBM_DAILY_DIGEST_DISCORD_CHANNEL_ID ?? '1487057203105108000',
   debug
 };
 
@@ -87,57 +89,134 @@ async function main(): Promise<void> {
       return;
     }
     case 'run': {
-      const { config, sourceLabel, pipelineLabel, catalog } = resolveRuntimeConfig();
-      logger.info(`Startup: ${sourceLabel}`);
-      const profileFilter = getFlagValue('--profile');
-      const filteredProfiles = profileFilter
-        ? config.profiles.filter((profile) => profile.id === profileFilter)
-        : config.profiles;
-
-      if (profileFilter && filteredProfiles.length === 0) {
-        throw new Error(`No profile matched --profile ${profileFilter}`);
-      }
-
-      const mockPath = getFlagValue('--mock');
-      const mockProfileIds = mockPath
-        ? new Set(loadMockRun(path.resolve(mockPath)).profiles.map((profile) => profile.profileId))
-        : null;
-      const effectiveConfig: AppConfig = {
-        profiles: mockProfileIds && !profileFilter
-          ? filteredProfiles.filter((profile) => mockProfileIds.has(profile.id))
-          : filteredProfiles
-      };
-      logger.info(`Config loaded: ${effectiveConfig.profiles.filter((profile) => profile.enabled).length} enabled profile(s)`);
-      if (profileFilter) logger.info(`Diagnostic mode: restricted to profile ${profileFilter}`);
-      if (mockPath) logger.info(`Mock mode enabled with ${path.resolve(mockPath)}`);
-      logger.info(pipelineLabel);
-      logger.info(`Runtime caps: queryVariants<=${env.maxQueryVariantsPerProfile}, stopAfterCollected>=${env.stopAfterCollectedCount}, maxListings<=${env.maxListingsPerProfile}, detailEnrichmentTopN<=${env.detailEnrichmentTopN}, profileTimeoutMs=${env.profileTimeoutMs}`);
-      if (catalog) {
-        persistCatalogSnapshot(catalog, env.catalogPath);
-        logger.info(`Catalog scope: ${catalog.metadata.scopeLabel ?? 'unspecified'}`);
-        logger.info(`Catalog topics active: ${catalog.metadata.activeTopicIds.join(', ') || 'none'}`);
-      }
-
-      const result = await runMonitor(effectiveConfig, {
-        ...env,
-        mockPath: mockPath ? path.resolve(mockPath) : undefined,
-        logger
-      });
-      const digestFormat = getDigestFormat();
-      const digestToPrint = result.digests[digestFormat];
-      fs.mkdirSync(path.resolve('runtime'), { recursive: true });
-      fs.writeFileSync(path.resolve('runtime/latest-digest.txt'), digestToPrint, 'utf8');
-      fs.writeFileSync(path.resolve('runtime/latest-digest.discord.txt'), result.digests.discord, 'utf8');
-      fs.writeFileSync(path.resolve('runtime/latest-digest.email.txt'), result.digests.email, 'utf8');
-      fs.writeFileSync(path.resolve('runtime/latest-digest.debug.discord.txt'), result.digests.debugDiscord, 'utf8');
-      fs.writeFileSync(path.resolve('runtime/latest-digest.debug.email.txt'), result.digests.debugEmail, 'utf8');
-      console.log(digestToPrint);
-      console.log(`\nRun ${result.runId} finished with status=${result.status}`);
+      await handleRunCommand();
+      return;
+    }
+    case 'daily-digest': {
+      handleDailyDigestCommand();
       return;
     }
     default:
       throw new Error(`Unknown command: ${command}`);
   }
+}
+
+async function handleRunCommand(): Promise<void> {
+  const { config, sourceLabel, pipelineLabel, catalog } = resolveRuntimeConfig();
+  logger.info(`Startup: ${sourceLabel}`);
+  const profileFilter = getFlagValue('--profile');
+  const filteredProfiles = profileFilter
+    ? config.profiles.filter((profile) => profile.id === profileFilter)
+    : config.profiles;
+
+  if (profileFilter && filteredProfiles.length === 0) {
+    throw new Error(`No profile matched --profile ${profileFilter}`);
+  }
+
+  const mockPath = getFlagValue('--mock');
+  const mockProfileIds = mockPath
+    ? new Set(loadMockRun(path.resolve(mockPath)).profiles.map((profile) => profile.profileId))
+    : null;
+  const effectiveConfig: AppConfig = {
+    profiles: mockProfileIds && !profileFilter
+      ? filteredProfiles.filter((profile) => mockProfileIds.has(profile.id))
+      : filteredProfiles
+  };
+  logger.info(`Config loaded: ${effectiveConfig.profiles.filter((profile) => profile.enabled).length} enabled profile(s)`);
+  if (profileFilter) logger.info(`Diagnostic mode: restricted to profile ${profileFilter}`);
+  if (mockPath) logger.info(`Mock mode enabled with ${path.resolve(mockPath)}`);
+  logger.info(pipelineLabel);
+  logger.info(`Runtime caps: queryVariants<=${env.maxQueryVariantsPerProfile}, stopAfterCollected>=${env.stopAfterCollectedCount}, maxListings<=${env.maxListingsPerProfile}, detailEnrichmentTopN<=${env.detailEnrichmentTopN}, profileTimeoutMs=${env.profileTimeoutMs}`);
+  if (catalog) {
+    persistCatalogSnapshot(catalog, env.catalogPath);
+    logger.info(`Catalog scope: ${catalog.metadata.scopeLabel ?? 'unspecified'}`);
+    logger.info(`Catalog topics active: ${catalog.metadata.activeTopicIds.join(', ') || 'none'}`);
+  }
+
+  const result = await runMonitor(effectiveConfig, {
+    ...env,
+    mockPath: mockPath ? path.resolve(mockPath) : undefined,
+    logger
+  });
+  const digestFormat = getDigestFormat();
+  const digestToPrint = result.digests[digestFormat];
+  fs.mkdirSync(path.resolve('runtime'), { recursive: true });
+  fs.writeFileSync(path.resolve('runtime/latest-digest.txt'), digestToPrint, 'utf8');
+  fs.writeFileSync(path.resolve('runtime/latest-digest.discord.txt'), result.digests.discord, 'utf8');
+  fs.writeFileSync(path.resolve('runtime/latest-digest.email.txt'), result.digests.email, 'utf8');
+  fs.writeFileSync(path.resolve('runtime/latest-digest.debug.discord.txt'), result.digests.debugDiscord, 'utf8');
+  fs.writeFileSync(path.resolve('runtime/latest-digest.debug.email.txt'), result.digests.debugEmail, 'utf8');
+  console.log(digestToPrint);
+  console.log(`\nRun ${result.runId} finished with status=${result.status}`);
+}
+
+function handleDailyDigestCommand(): void {
+  const { config } = resolveRuntimeConfig();
+  const window = resolveDigestWindow(getFlagValue('--date'));
+  const db = openDatabase(env.dbPath);
+  migrate(db);
+  const candidates = getDailyDigestCandidates(db, {
+    windowStart: window.windowStart,
+    windowEnd: window.windowEnd,
+    profiles: config.profiles.filter((profile) => profile.enabled)
+  });
+  const runs = getRunSummariesInWindow(db, window.windowStart, window.windowEnd);
+  const discordDigest = generateDailyDigest({
+    dayLabel: window.dayLabel,
+    windowStart: window.windowStart,
+    windowEnd: window.windowEnd,
+    channelId: env.dailyDigestChannelId,
+    profiles: config.profiles.filter((profile) => profile.enabled).map((profile) => ({ id: profile.id, label: profile.label })),
+    candidates,
+    runs
+  }, 'discord');
+  const emailDigest = generateDailyDigest({
+    dayLabel: window.dayLabel,
+    windowStart: window.windowStart,
+    windowEnd: window.windowEnd,
+    channelId: env.dailyDigestChannelId,
+    profiles: config.profiles.filter((profile) => profile.enabled).map((profile) => ({ id: profile.id, label: profile.label })),
+    candidates,
+    runs
+  }, 'email');
+
+  fs.mkdirSync(path.resolve('runtime'), { recursive: true });
+  fs.writeFileSync(path.resolve('runtime/daily-digest.discord.txt'), discordDigest, 'utf8');
+  fs.writeFileSync(path.resolve('runtime/daily-digest.email.txt'), emailDigest, 'utf8');
+  fs.writeFileSync(path.resolve('runtime/daily-digest.meta.json'), `${JSON.stringify({
+    channelId: env.dailyDigestChannelId,
+    windowStart: window.windowStart,
+    windowEnd: window.windowEnd,
+    dayLabel: window.dayLabel,
+    candidateCount: candidates.length,
+    runCount: runs.length,
+    discordPath: path.resolve('runtime/daily-digest.discord.txt')
+  }, null, 2)}\n`, 'utf8');
+
+  const latestRunId = runs.at(-1)?.runId ?? 0;
+  if (latestRunId > 0) insertNotification(db, latestRunId, discordDigest, 'discord_daily_digest_preview');
+  db.close();
+  console.log(discordDigest);
+  console.log(`\nDaily digest prepared for Discord channel ${env.dailyDigestChannelId}`);
+}
+
+function resolveDigestWindow(dateArg?: string): { dayLabel: string; windowStart: string; windowEnd: string } {
+  const dayKey = dateArg ?? new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Melbourne',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+  const windowStart = new Date(`${dayKey}T00:00:00+10:00`).toISOString();
+  const windowEnd = new Date(`${dayKey}T24:00:00+10:00`).toISOString();
+  const label = new Intl.DateTimeFormat('en-AU', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Australia/Melbourne'
+  }).format(new Date(`${dayKey}T12:00:00+10:00`));
+  return { dayLabel: label, windowStart, windowEnd };
 }
 
 function resolveRuntimeConfig(): { config: AppConfig; sourceLabel: string; pipelineLabel: string; catalog?: TopicCatalog } {
