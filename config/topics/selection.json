@@ -1,5 +1,7 @@
 {
   "version": 1,
   "topicPath": "./config/topics/all-topics.json",
-  "activeTopicIds": ["premium-drivers"]
+  "activeTopicIds": [
+    "custom"
+  ]
 }

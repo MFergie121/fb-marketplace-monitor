@@ -636,65 +636,132 @@
           }
         },
         {
-          "id": "custom-driving-irons",
-          "label": "Driving irons",
-          "brand": "Custom",
-          "family": "Driving irons",
+          "id": "custom-rm-williams-boots-us7",
+          "label": "Men's RM Williams Boots US 7",
+          "brand": "RM Williams",
+          "family": "RM Williams Boots US 7",
           "queries": [
-            "driving iron",
-            "utility iron",
-            "2 iron utility",
-            "3 iron utility"
+            "rm williams boots us 7",
+            "rm williams boots 7g",
+            "rm williams boots 7h",
+            "rm williams boots 7f"
           ],
           "matchTerms": [
-            "driving iron",
-            "utility iron",
-            "2 iron",
-            "3 iron"
+            "rm williams",
+            "boots",
+            "7",
+            "7f",
+            "7g",
+            "7h"
           ],
           "searchTerms": [
-            "driving iron",
-            "utility iron",
-            "2 iron",
-            "3 iron",
-            "utility",
-            "u505",
-            "dhy"
+            "rm williams",
+            "boots",
+            "mens",
+            "men",
+            "us 7",
+            "7f",
+            "7g",
+            "7h"
           ],
           "exclusions": [
-            "wedge",
-            "gap wedge",
-            "sand wedge",
-            "lob wedge",
-            "iron set",
-            "full set",
-            "set of",
-            "4-pw",
-            "5-pw",
-            "shaft only",
-            "head only",
-            "adapter",
-            "grip",
-            "headcover only",
-            "bag",
-            "club lot",
-            "bundle",
-            "accessory",
-            "head only",
-            "shaft",
-            "shafts"
+            "women",
+            "womens",
+            "women's",
+            "ladies",
+            "kids",
+            "junior",
+            "size 6",
+            "size 8",
+            "8g",
+            "8h",
+            "6g",
+            "6h",
+            "wallet",
+            "belt",
+            "hat",
+            "care kit",
+            "conditioner",
+            "polish",
+            "damaged",
+            "sole repair",
+            "for parts",
+            "fake",
+            "replica"
           ],
           "priceBand": {
-            "min": 60,
-            "max": 450
+            "min": 80,
+            "max": 700
           },
           "listingTypeScope": "single_item",
-          "category": "golf",
+          "category": "boots",
           "valuation": {
-            "priceLow": 120,
-            "priceHigh": 320,
+            "priceLow": 180,
+            "priceHigh": 500,
             "confidence": "low",
-            "notes": "Single-club driving/utility iron profile. Excludes wedges, sets, shafts-only and accessory noise."
+            "notes": "Focused mens RM Williams boots search for US 7 / widths F,G,H. Condition and exact size/width remain critical."
+          }
+        },
+        {
+          "id": "custom-oral-b-io3",
+          "label": "Oral-B iO 3 Series Electric Toothbrush",
+          "brand": "Oral-B",
+          "family": "iO 3 Series",
+          "queries": [
+            "oral b io 3",
+            "oral-b io3 toothbrush",
+            "oral b io 3 series",
+            "oral-b io electric toothbrush"
+          ],
+          "matchTerms": [
+            "oral-b",
+            "oral b",
+            "io 3",
+            "io3",
+            "toothbrush"
+          ],
+          "searchTerms": [
+            "oral-b",
+            "oral b",
+            "io 3",
+            "io3",
+            "electric toothbrush",
+            "toothbrush"
+          ],
+          "exclusions": [
+            "replacement heads",
+            "brush heads",
+            "heads only",
+            "charger only",
+            "handle only",
+            "case only",
+            "refill",
+            "refills",
+            "used heads",
+            "parts",
+            "for parts",
+            "damaged",
+            "broken",
+            "io 2",
+            "io 4",
+            "io 5",
+            "io 6",
+            "io 7",
+            "io 8",
+            "io 9",
+            "io 10"
+          ],
+          "priceBand": {
+            "min": 10,
+            "max": 75
+          },
+          "listingTypeScope": "single_item",
+          "category": "toothbrush",
+          "valuation": {
+            "priceLow": 25,
+            "priceHigh": 75,
+            "confidence": "low",
+            "notes": "Focused Oral-B iO 3 series search capped at $75. Accessory/heads-only noise should be excluded aggressively."
           }
         }
       ]
